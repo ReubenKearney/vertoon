@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="geometricPrecision" role="img" aria-label="WORDWERX icon">
+  <title>WORDWERX icon</title>
+  <defs><clipPath id="weave2"><rect x="0" y="0" width="512" height="256.0"></rect></clipPath></defs>
+  <path d="M 138.00,282.0 L 142.00,282.0 L 322.00,166.00 L 242.00,282.0 L 374.00,282.0 A 42,42 0 0,1 416.00,324.0 L 416.00,410.0 A 42,42 0 0,1 374.00,452.0 L 138.00,452.0 A 42,42 0 0,1 96.00,410.0 L 96.00,324.0 A 42,42 0 0,1 138.00,282.0 Z" fill="#2563EB"></path>
+  <path d="M 138.00,60.0 L 374.00,60.0 A 42,42 0 0,1 416.00,102.0 L 416.00,188.0 A 42,42 0 0,1 374.00,230.0 L 370.00,230.0 L 190.00,346.00 L 270.00,230.0 L 138.00,230.0 A 42,42 0 0,1 96.00,188.0 L 96.00,102.0 A 42,42 0 0,1 138.00,60.0 Z" fill="#1F2937"></path>
+  <g clip-path="url(#weave2)"><polygon points="142.0,282.0 242.0,282.0 322.0,166.0" fill="#2563EB"></polygon></g>
+</svg>

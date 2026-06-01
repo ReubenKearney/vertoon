@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 580" width="500" height="580" shape-rendering="geometricPrecision">
+
+  
+
+  
+  
+  <path d="&#xA;    M40,0&#xA;    L210,0&#xA;    Q250,0 250,40&#xA;    L250,420&#xA;    Q250,460 210,460&#xA;    L155,460&#xA;    L110,560&#xA;    L75,460&#xA;    L40,460&#xA;    Q0,460 0,420&#xA;    L0,40&#xA;    Q0,0 40,0&#xA;    Z&#xA;  " fill="#00BFD8"></path>
+
+  
+  <path d="&#xA;    M266,0&#xA;    L484,0&#xA;    Q500,0 500,16&#xA;    L500,444&#xA;    Q500,460 484,460&#xA;    L266,460&#xA;    Q250,460 250,444&#xA;    L250,16&#xA;    Q250,0 266,0&#xA;    Z&#xA;  " fill="#E8394A"></path>
+
+  
+  <text x="125" y="105" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">W</text>
+  <text x="125" y="210" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">O</text>
+  <text x="125" y="315" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">R</text>
+  <text x="125" y="420" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">D</text>
+
+  
+  <text x="375" y="105" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">W</text>
+  <text x="375" y="210" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">E</text>
+  <text x="375" y="315" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">R</text>
+  <text x="375" y="420" text-anchor="middle" font-family="&#39;Arial Black&#39;, &#39;Arial&#39;, sans-serif" font-size="96" font-weight="900" fill="white">X</text>
+
+</svg>
