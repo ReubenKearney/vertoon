@@ -45,8 +45,14 @@ export function usePreviewEngine(panels: any[]) {
   const [auto, setAuto] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [taps, setTaps] = React.useState<Record<string, boolean>>({});
+  const [holdingId, setHoldingId] = React.useState<string | null>(null);
   const lastActive = React.useRef(-1);
   const pvSmooth = React.useRef<Record<string, number>>({});
+  // pacing state: which panel is mid-beat, when the beat ends, and which panels are done
+  const heldPanel = React.useRef<string | null>(null);
+  const holdUntil = React.useRef(0);
+  const served = React.useRef<Record<string, boolean>>({});
+  const holdingRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     let raf: number;
@@ -70,6 +76,10 @@ export function usePreviewEngine(panels: any[]) {
             scene.style.setProperty('--px', String(px));
             scene.style.setProperty('--py', String(py));
           }
+          // transition progress: 0 while the panel's bottom edge is at the viewport
+          // bottom, 1 once it has swept up to the viewport top (panel handing off).
+          const exitFrac = Math.max(0, Math.min(1, (vh - (top + el.offsetHeight)) / vh));
+          el.style.setProperty('--tx', String(exitFrac));
           if (center < vh * 0.9) el.classList.add('is-in'); else el.classList.remove('is-in');
           const d = Math.abs(center - vc);
           if (d < bestD) { bestD = d; best = i; }
@@ -84,7 +94,28 @@ export function usePreviewEngine(panels: any[]) {
         }
         const max = c.scrollHeight - c.clientHeight;
         setProgress(max > 0 ? c.scrollTop / max : 0);
-        if (auto && max > 0) { c.scrollTop = Math.min(max, c.scrollTop + 1.1); if (c.scrollTop >= max) setAuto(false); }
+
+        // pacing: modulate the auto-scroll delta only (never fights manual scroll)
+        const now = performance.now();
+        let nowHolding: string | null = null;
+        let delta = 1.1;
+        const ap = panels[best];
+        const pace = ap && ap.fx.find((f: any) => f.type === 'pacing' && f.on);
+        if (pace) {
+          const centered = bestD < vh * 0.18;
+          const len = (pace.params.Length || 1) * 1000;
+          if (centered && !served.current[ap.id]) {
+            if (heldPanel.current !== ap.id) { heldPanel.current = ap.id; holdUntil.current = now + len; }
+            if (now < holdUntil.current) {
+              delta = pace.params.Mode === 'Slow scrub' ? delta * 0.25 : 0;
+              nowHolding = ap.id;
+            } else {
+              served.current[ap.id] = true;
+            }
+          }
+        }
+        if (nowHolding !== holdingRef.current) { holdingRef.current = nowHolding; setHoldingId(nowHolding); }
+        if (auto && max > 0) { c.scrollTop = Math.min(max, c.scrollTop + delta); if (c.scrollTop >= max) setAuto(false); }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -92,7 +123,11 @@ export function usePreviewEngine(panels: any[]) {
     return () => cancelAnimationFrame(raf);
   }, [panels, auto]);
 
-  const restart = () => { if (scroller.current) scroller.current.scrollTop = 0; setAuto(true); };
+  const restart = () => {
+    if (scroller.current) scroller.current.scrollTop = 0;
+    served.current = {}; heldPanel.current = null; holdUntil.current = 0;
+    setAuto(true);
+  };
 
-  return { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, restart };
+  return { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, holdingId, restart };
 }

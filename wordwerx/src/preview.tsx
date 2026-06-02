@@ -6,13 +6,27 @@ import { Scene } from './scenes';
 import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
 export function Preview({ panels }: any) {
-  const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, restart } = usePreviewEngine(panels);
-  const [shaking, setShaking] = React.useState(false);
+  const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, holdingId, restart } = usePreviewEngine(panels);
+  const phoneRef = React.useRef<HTMLDivElement>(null);
 
-  // restart the one-shot shake animation on each impact (toggle off→on, no remount)
+  // Impact shake: a one-shot Web Animation on the phone frame (not the scroller, so
+  // scrollTop/parallax are untouched). WAA survives the engine's per-frame re-renders,
+  // and avoids setState-in-effect cascading renders.
   React.useEffect(() => {
-    if (shakeKey > 0) { setShaking(false); const r = requestAnimationFrame(() => setShaking(true)); return () => cancelAnimationFrame(r); }
-  }, [shakeKey]);
+    const el = phoneRef.current;
+    if (!el || shakeKey === 0) return;
+    const a = shakeAmp;
+    el.animate([
+      { transform: 'translate3d(0,0,0)' },
+      { transform: `translate3d(${a * -5}px, ${a * 3}px, 0)`, offset: 0.1 },
+      { transform: `translate3d(${a * 6}px, ${a * -4}px, 0)`, offset: 0.25 },
+      { transform: `translate3d(${a * -5}px, ${a * 4}px, 0)`, offset: 0.4 },
+      { transform: `translate3d(${a * 4}px, ${a * -3}px, 0)`, offset: 0.55 },
+      { transform: `translate3d(${a * -3}px, ${a * 2}px, 0)`, offset: 0.7 },
+      { transform: `translate3d(${a * 2}px, ${a * -1}px, 0)`, offset: 0.85 },
+      { transform: 'translate3d(0,0,0)' },
+    ], { duration: 420, easing: 'cubic-bezier(.36,.07,.19,.97)' });
+  }, [shakeKey, shakeAmp]);
 
   const cur = panels[active] || panels[0];
 
@@ -34,7 +48,7 @@ export function Preview({ panels }: any) {
         <div className="ww-pv-hint">Scroll inside the phone — or hit auto-scroll. Tap the glowing rings.</div>
       </div>
 
-      <div className={cx('ww-phone', shaking && 'is-shaking')} style={{ '--shake': shakeAmp } as any} onAnimationEnd={(e) => { if (e.target === e.currentTarget) setShaking(false); }}>
+      <div className="ww-phone" ref={phoneRef}>
         <div className="ww-phone-notch" />
         <div className="ww-reader" ref={scroller}>
           {panels.map((p: any, i: number) => {
@@ -42,6 +56,7 @@ export function Preview({ panels }: any) {
             const tap = p.fx.find((f: any) => f.type === 'tap' && f.on);
             const loop = p.fx.find((f: any) => f.type === 'loop' && f.on);
             const pace = p.fx.find((f: any) => f.type === 'pacing' && f.on);
+            const trans = p.fx.find((f: any) => f.type === 'transition' && f.on);
             return (
               <section key={p.id} ref={(el: HTMLElement | null) => { panelRefs.current[p.id] = el; }}
                 className="ww-rpanel" data-motion={reveal ? reveal.params.Motion : 'Fade'}
@@ -51,7 +66,8 @@ export function Preview({ panels }: any) {
                 {p.dialogue
                   ? <div className="ww-rev ww-rdlg"><span className="ww-rdlg-name">{p.speaker}</span>{p.dialogue}</div>
                   : p.caption ? <div className="ww-rev ww-rcap">{p.caption}</div> : null}
-                {pace && <div className="ww-rev ww-rpace">{pace.params.Mode} · {pace.params.Length}s</div>}
+                {pace && <div className={cx('ww-rev ww-rpace', holdingId === p.id && 'is-holding')}>{pace.params.Mode} · {pace.params.Length}s</div>}
+                {trans && <div className="ww-rtrans" data-trans={trans.params.Type} />}
                 {tap && (
                   <button className={cx('ww-hotspot', taps[p.id] && 'is-done')} onClick={() => setTaps(t => ({ ...t, [p.id]: !t[p.id] }))}>
                     <span className="ww-hot-ring" />
