@@ -1,3 +1,4 @@
+import React from 'react';
 import { cx } from './ui';
 import { FxChip } from './ui';
 import { EPISODE } from './data';
@@ -5,7 +6,13 @@ import { Scene } from './scenes';
 import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
 export function Preview({ panels }: any) {
-  const { scroller, panelRefs, active, flashKey, auto, setAuto, progress, taps, setTaps, restart } = usePreviewEngine(panels);
+  const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, restart } = usePreviewEngine(panels);
+  const [shaking, setShaking] = React.useState(false);
+
+  // restart the one-shot shake animation on each impact (toggle off→on, no remount)
+  React.useEffect(() => {
+    if (shakeKey > 0) { setShaking(false); const r = requestAnimationFrame(() => setShaking(true)); return () => cancelAnimationFrame(r); }
+  }, [shakeKey]);
 
   const cur = panels[active] || panels[0];
 
@@ -27,7 +34,7 @@ export function Preview({ panels }: any) {
         <div className="ww-pv-hint">Scroll inside the phone — or hit auto-scroll. Tap the glowing rings.</div>
       </div>
 
-      <div className="ww-phone">
+      <div className={cx('ww-phone', shaking && 'is-shaking')} style={{ '--shake': shakeAmp } as any} onAnimationEnd={(e) => { if (e.target === e.currentTarget) setShaking(false); }}>
         <div className="ww-phone-notch" />
         <div className="ww-reader" ref={scroller}>
           {panels.map((p: any, i: number) => {
@@ -39,7 +46,7 @@ export function Preview({ panels }: any) {
               <section key={p.id} ref={(el: HTMLElement | null) => { panelRefs.current[p.id] = el; }}
                 className="ww-rpanel" data-motion={reveal ? reveal.params.Motion : 'Fade'}
                 style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px', '--rev-ease': mapEasing(reveal ? reveal.params.Easing : 'ease-out') } as any}>
-                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} /></div>
+                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} loopDensity={loop ? loop.params.Density : 55} loopSpeed={loop ? loop.params.Speed : 1} /></div>
                 <div className="ww-rpanel-grade" />
                 {p.dialogue
                   ? <div className="ww-rev ww-rdlg"><span className="ww-rdlg-name">{p.speaker}</span>{p.dialogue}</div>

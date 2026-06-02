@@ -14,6 +14,12 @@ const SCENE_CSS = `
 .ww-scene{position:absolute;inset:0;overflow:hidden;background:#06070c;}
 .ww-scene > *{position:absolute;}
 .ww-insects{position:absolute;inset:0;background-image:radial-gradient(circle, rgba(20,20,25,.9) 1.2px, transparent 1.4px);background-size:34px 30px;animation:ww-drift 3s linear infinite alternate;}
+@keyframes ww-static{0%,100%{opacity:var(--lo,.2)}33%{opacity:calc(var(--lo,.2) * 1.4)}50%{opacity:calc(var(--lo,.2) * .35)}}
+.ww-loop{position:absolute;inset:0;pointer-events:none;}
+.ww-loop-flicker{background:radial-gradient(120% 90% at 50% 42%, rgba(255,200,120,.55), transparent 68%);mix-blend-mode:screen;animation:ww-flicker 4s infinite;}
+.ww-loop-breathe{background:radial-gradient(100% 82% at 50% 50%, transparent 52%, rgba(0,0,0,.6));animation:ww-breathe 4s ease-in-out infinite;}
+.ww-loop-static{mix-blend-mode:overlay;animation:ww-static .4s steps(3) infinite;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
 `;
 
 export function injectSceneCss() {
@@ -170,7 +176,30 @@ export const SCENES: Record<string, () => React.ReactElement> = {
   </React.Fragment>),
 };
 
-export function Scene({ kind, py = 0, strength = 0, loop = null, className = '', style = {} }: any) {
+// A continuous ambient loop overlay. Density (0-100) drives intensity/coverage;
+// Speed (×) drives animation rate (faster = shorter duration).
+function LoopOverlay({ kind, density = 55, speed = 1 }: any) {
+  const d = density / 100;
+  const dur = (base: number) => (base / Math.max(0.2, speed)) + 's';
+  switch (kind) {
+    case 'Insect swarm':
+      return <div className="ww-insects" style={{ opacity: 0.35 + d * 0.65, backgroundSize: `${44 - d * 18}px ${40 - d * 16}px`, animationDuration: dur(3) }} />;
+    case 'Rain':
+      return <div className="ww-loop" style={{ opacity: 0.3 + d * 0.7, backgroundImage: 'repeating-linear-gradient(105deg, rgba(180,200,230,.18) 0 1px, transparent 1px 7px)', animation: `ww-rain ${dur(0.7)} linear infinite` }} />;
+    case 'Dust drift':
+      return <div className="ww-loop" style={{ opacity: 0.25 + d * 0.6, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.25) 1px, transparent 1.5px)', backgroundSize: '60px 60px', animation: `ww-drift ${dur(6)} linear infinite alternate` }} />;
+    case 'Lamp flicker':
+      return <div className="ww-loop ww-loop-flicker" style={{ opacity: 0.3 + d * 0.6, animationDuration: dur(4) }} />;
+    case 'Breathing':
+      return <div className="ww-loop ww-loop-breathe" style={{ opacity: 0.4 + d * 0.6, animationDuration: dur(4) }} />;
+    case 'Static':
+      return <div className="ww-loop ww-loop-static" style={{ '--lo': 0.15 + d * 0.5, animationDuration: dur(0.4) } as any} />;
+    default:
+      return null;
+  }
+}
+
+export function Scene({ kind, py = 0, strength = 0, loop = null, loopDensity = 55, loopSpeed = 1, className = '', style = {} }: any) {
   React.useEffect(injectSceneCss, []);
   const ref = React.useRef<HTMLDivElement>(null);
   const Builder = SCENES[kind] || SCENES.dusk_skyline;
@@ -190,9 +219,7 @@ export function Scene({ kind, py = 0, strength = 0, loop = null, className = '',
   return (
     <div ref={ref} className={'ww-scene ' + className} style={style}>
       <Builder />
-      {loop === 'Insect swarm' && <div className="ww-insects" />}
-      {loop === 'Rain' && <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-linear-gradient(105deg, rgba(180,200,230,.18) 0 1px, transparent 1px 7px)', animation: 'ww-rain 0.7s linear infinite' }} />}
-      {loop === 'Dust drift' && <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,.25) 1px, transparent 1.5px)', backgroundSize: '60px 60px', animation: 'ww-drift 6s linear infinite alternate' }} />}
+      {loop && <LoopOverlay kind={loop} density={loopDensity} speed={loopSpeed} />}
     </div>
   );
 }

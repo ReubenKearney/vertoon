@@ -5,6 +5,7 @@ export function parallaxStrength(p: any) { const f = p.fx.find((x: any) => x.typ
 export function hasFx(p: any, t: string) { return p.fx.some((f: any) => f.type === t && f.on); }
 export function soundLabel(p: any) { const f = p.fx.find((x: any) => x.type === 'sound' && x.on); return f ? f.params.Source : ''; }
 export function flashColor(p: any) { const f = p.fx.find((x: any) => x.type === 'impact' && x.on); const c = f ? f.params.Flash : 'White'; return ({ White: '#fff', Red: 'oklch(0.7 0.2 25)', Black: '#000' } as any)[c] || '#fff'; }
+export function impactIntensity(p: any) { const f = p.fx.find((x: any) => x.type === 'impact' && x.on); return f ? (f.params.Intensity / 100) : 0; }
 export function tapPayload(p: any) {
   const f = p.fx.find((x: any) => x.type === 'tap' && x.on); const a = f ? f.params.Action : '';
   if (p.scene === 'lantern_hub') return 'Logbook found';
@@ -39,6 +40,8 @@ export function usePreviewEngine(panels: any[]) {
   const panelRefs = React.useRef<Record<string, HTMLElement | null>>({});
   const [active, setActive] = React.useState(0);
   const [flashKey, setFlashKey] = React.useState(0);
+  const [shakeKey, setShakeKey] = React.useState(0);
+  const [shakeAmp, setShakeAmp] = React.useState(0);
   const [auto, setAuto] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [taps, setTaps] = React.useState<Record<string, boolean>>({});
@@ -73,7 +76,11 @@ export function usePreviewEngine(panels: any[]) {
         });
         if (best !== lastActive.current) {
           lastActive.current = best; setActive(best);
-          if (hasFx(panels[best], 'impact')) setFlashKey(k => k + 1);
+          if (hasFx(panels[best], 'impact')) {
+            setFlashKey(k => k + 1);
+            setShakeAmp(impactIntensity(panels[best]));
+            setShakeKey(k => k + 1);
+          }
         }
         const max = c.scrollHeight - c.clientHeight;
         setProgress(max > 0 ? c.scrollTop / max : 0);
@@ -87,5 +94,5 @@ export function usePreviewEngine(panels: any[]) {
 
   const restart = () => { if (scroller.current) scroller.current.scrollTop = 0; setAuto(true); };
 
-  return { scroller, panelRefs, active, flashKey, auto, setAuto, progress, taps, setTaps, restart };
+  return { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, restart };
 }
