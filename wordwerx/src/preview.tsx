@@ -1,64 +1,13 @@
-import React from 'react';
 import { cx } from './ui';
 import { FxChip } from './ui';
 import { EPISODE } from './data';
 import { Scene } from './scenes';
-
-function parallaxStrength(p: any) { const f = p.fx.find((x: any) => x.type === 'parallax' && x.on); return f ? (f.params.Strength / 100) * 1.45 : 0.55; }
-function hasFx(p: any, t: string) { return p.fx.some((f: any) => f.type === t && f.on); }
-function soundLabel(p: any) { const f = p.fx.find((x: any) => x.type === 'sound' && x.on); return f ? f.params.Source : ''; }
-function flashColor(p: any) { const f = p.fx.find((x: any) => x.type === 'impact' && x.on); const c = f ? f.params.Flash : 'White'; return ({ White: '#fff', Red: 'oklch(0.7 0.2 25)', Black: '#000' } as any)[c] || '#fff'; }
-function tapPayload(p: any) {
-  const f = p.fx.find((x: any) => x.type === 'tap' && x.on); const a = f ? f.params.Action : '';
-  if (p.scene === 'lantern_hub') return 'Logbook found';
-  if (p.scene === 'logbook') return 'Branch: photograph / flee';
-  return a;
-}
+import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
 export function Preview({ panels }: any) {
-  const scroller = React.useRef<HTMLDivElement>(null);
-  const panelRefs = React.useRef<Record<string, HTMLElement | null>>({});
-  const [active, setActive] = React.useState(0);
-  const [flashKey, setFlashKey] = React.useState(0);
-  const [auto, setAuto] = React.useState(false);
-  const [progress, setProgress] = React.useState(0);
-  const [taps, setTaps] = React.useState<Record<string, boolean>>({});
-  const lastActive = React.useRef(-1);
-
-  React.useEffect(() => {
-    let raf: number;
-    const loop = () => {
-      const c = scroller.current;
-      if (c) {
-        const vh = c.clientHeight, vc = vh / 2;
-        let best = 0, bestD = 1e9;
-        panels.forEach((p: any, i: number) => {
-          const el = panelRefs.current[p.id]; if (!el) return;
-          const top = el.offsetTop - c.scrollTop;
-          const center = top + el.offsetHeight / 2;
-          const pv = Math.max(-1.3, Math.min(1.3, (center - vc) / vh));
-          const scene = el.querySelector('.ww-scene') as HTMLElement | null;
-          if (scene) scene.style.setProperty('--p', String(-pv * (parallaxStrength(p))));
-          if (center < vh * 0.9) el.classList.add('is-in'); else el.classList.remove('is-in');
-          const d = Math.abs(center - vc);
-          if (d < bestD) { bestD = d; best = i; }
-        });
-        if (best !== lastActive.current) {
-          lastActive.current = best; setActive(best);
-          if (hasFx(panels[best], 'impact')) setFlashKey(k => k + 1);
-        }
-        const max = c.scrollHeight - c.clientHeight;
-        setProgress(max > 0 ? c.scrollTop / max : 0);
-        if (auto && max > 0) { c.scrollTop = Math.min(max, c.scrollTop + 1.1); if (c.scrollTop >= max) setAuto(false); }
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [panels, auto]);
+  const { scroller, panelRefs, active, flashKey, auto, setAuto, progress, taps, setTaps, restart } = usePreviewEngine(panels);
 
   const cur = panels[active] || panels[0];
-  const restart = () => { if (scroller.current) scroller.current.scrollTop = 0; setAuto(true); };
 
   return (
     <div className="ww-preview">
@@ -89,7 +38,7 @@ export function Preview({ panels }: any) {
             return (
               <section key={p.id} ref={(el: HTMLElement | null) => { panelRefs.current[p.id] = el; }}
                 className="ww-rpanel" data-motion={reveal ? reveal.params.Motion : 'Fade'}
-                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px' } as any}>
+                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px', '--rev-ease': mapEasing(reveal ? reveal.params.Easing : 'ease-out') } as any}>
                 <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} /></div>
                 <div className="ww-rpanel-grade" />
                 {p.dialogue

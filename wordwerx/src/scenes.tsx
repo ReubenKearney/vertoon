@@ -182,7 +182,7 @@ export function Scene({ kind, py = 0, strength = 0, loop = null, className = '',
       el.style.willChange = 'transform';
       const base = el.style.transform && !el.style.transform.includes('var(') ? el.style.transform : '';
       el.style.setProperty('--d', String(d * 74));
-      el.style.transform = `translate3d(0, calc(var(--p,0) * var(--d,0) * 1px), 0) ${base}`;
+      el.style.transform = `translate3d(calc(var(--px,0) * var(--d,0) * 1px), calc(var(--py,0) * var(--d,0) * 1px), 0) ${base}`;
       el.dataset.wwInit = '1';
     });
     root.style.setProperty('--p', String(py * strength));

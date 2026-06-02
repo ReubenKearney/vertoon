@@ -342,7 +342,7 @@ input,textarea,select{font-family:inherit;color:inherit;}
 .ww-rpanel[data-motion="Slide left"] .ww-rev{transform:translateX(var(--rev-dist,40px));}
 .ww-rpanel[data-motion="Scale in"] .ww-rev{transform:scale(.84);}
 .ww-rpanel[data-motion="Blur in"] .ww-rev{filter:blur(10px);}
-.ww-rpanel.is-in .ww-rev{animation:ww-reveal var(--rev-dur,.8s) cubic-bezier(.2,.7,.2,1) forwards;}
+.ww-rpanel.is-in .ww-rev{animation:ww-reveal var(--rev-dur,.8s) var(--rev-ease, cubic-bezier(.2,.7,.2,1)) forwards;}
 @keyframes ww-reveal{to{opacity:1;transform:none;filter:none;}}
 .ww-rcap{position:absolute;left:18px;right:18px;bottom:30px;font-size:15px;line-height:1.5;color:#f4f2ef;text-shadow:0 2px 10px #000;text-wrap:pretty;z-index:6;}
 .ww-rdlg{position:absolute;left:18px;right:18px;bottom:30px;font-size:16px;line-height:1.5;color:#fff;z-index:6;
