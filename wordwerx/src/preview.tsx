@@ -3,62 +3,32 @@ import { cx } from './ui';
 import { FxChip } from './ui';
 import { EPISODE } from './data';
 import { Scene } from './scenes';
-
-function parallaxStrength(p: any) { const f = p.fx.find((x: any) => x.type === 'parallax' && x.on); return f ? (f.params.Strength / 100) * 1.45 : 0.55; }
-function hasFx(p: any, t: string) { return p.fx.some((f: any) => f.type === t && f.on); }
-function soundLabel(p: any) { const f = p.fx.find((x: any) => x.type === 'sound' && x.on); return f ? f.params.Source : ''; }
-function flashColor(p: any) { const f = p.fx.find((x: any) => x.type === 'impact' && x.on); const c = f ? f.params.Flash : 'White'; return ({ White: '#fff', Red: 'oklch(0.7 0.2 25)', Black: '#000' } as any)[c] || '#fff'; }
-function tapPayload(p: any) {
-  const f = p.fx.find((x: any) => x.type === 'tap' && x.on); const a = f ? f.params.Action : '';
-  if (p.scene === 'lantern_hub') return 'Logbook found';
-  if (p.scene === 'logbook') return 'Branch: photograph / flee';
-  return a;
-}
+import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
 export function Preview({ panels }: any) {
-  const scroller = React.useRef<HTMLDivElement>(null);
-  const panelRefs = React.useRef<Record<string, HTMLElement | null>>({});
-  const [active, setActive] = React.useState(0);
-  const [flashKey, setFlashKey] = React.useState(0);
-  const [auto, setAuto] = React.useState(false);
-  const [progress, setProgress] = React.useState(0);
-  const [taps, setTaps] = React.useState<Record<string, boolean>>({});
-  const lastActive = React.useRef(-1);
+  const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, holdingId, restart } = usePreviewEngine(panels);
+  const phoneRef = React.useRef<HTMLDivElement>(null);
 
+  // Impact shake: a one-shot Web Animation on the phone frame (not the scroller, so
+  // scrollTop/parallax are untouched). WAA survives the engine's per-frame re-renders,
+  // and avoids setState-in-effect cascading renders.
   React.useEffect(() => {
-    let raf: number;
-    const loop = () => {
-      const c = scroller.current;
-      if (c) {
-        const vh = c.clientHeight, vc = vh / 2;
-        let best = 0, bestD = 1e9;
-        panels.forEach((p: any, i: number) => {
-          const el = panelRefs.current[p.id]; if (!el) return;
-          const top = el.offsetTop - c.scrollTop;
-          const center = top + el.offsetHeight / 2;
-          const pv = Math.max(-1.3, Math.min(1.3, (center - vc) / vh));
-          const scene = el.querySelector('.ww-scene') as HTMLElement | null;
-          if (scene) scene.style.setProperty('--p', String(-pv * (parallaxStrength(p))));
-          if (center < vh * 0.9) el.classList.add('is-in'); else el.classList.remove('is-in');
-          const d = Math.abs(center - vc);
-          if (d < bestD) { bestD = d; best = i; }
-        });
-        if (best !== lastActive.current) {
-          lastActive.current = best; setActive(best);
-          if (hasFx(panels[best], 'impact')) setFlashKey(k => k + 1);
-        }
-        const max = c.scrollHeight - c.clientHeight;
-        setProgress(max > 0 ? c.scrollTop / max : 0);
-        if (auto && max > 0) { c.scrollTop = Math.min(max, c.scrollTop + 1.1); if (c.scrollTop >= max) setAuto(false); }
-      }
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [panels, auto]);
+    const el = phoneRef.current;
+    if (!el || shakeKey === 0) return;
+    const a = shakeAmp;
+    el.animate([
+      { transform: 'translate3d(0,0,0)' },
+      { transform: `translate3d(${a * -5}px, ${a * 3}px, 0)`, offset: 0.1 },
+      { transform: `translate3d(${a * 6}px, ${a * -4}px, 0)`, offset: 0.25 },
+      { transform: `translate3d(${a * -5}px, ${a * 4}px, 0)`, offset: 0.4 },
+      { transform: `translate3d(${a * 4}px, ${a * -3}px, 0)`, offset: 0.55 },
+      { transform: `translate3d(${a * -3}px, ${a * 2}px, 0)`, offset: 0.7 },
+      { transform: `translate3d(${a * 2}px, ${a * -1}px, 0)`, offset: 0.85 },
+      { transform: 'translate3d(0,0,0)' },
+    ], { duration: 420, easing: 'cubic-bezier(.36,.07,.19,.97)' });
+  }, [shakeKey, shakeAmp]);
 
   const cur = panels[active] || panels[0];
-  const restart = () => { if (scroller.current) scroller.current.scrollTop = 0; setAuto(true); };
 
   return (
     <div className="ww-preview">
@@ -78,7 +48,7 @@ export function Preview({ panels }: any) {
         <div className="ww-pv-hint">Scroll inside the phone — or hit auto-scroll. Tap the glowing rings.</div>
       </div>
 
-      <div className="ww-phone">
+      <div className="ww-phone" ref={phoneRef}>
         <div className="ww-phone-notch" />
         <div className="ww-reader" ref={scroller}>
           {panels.map((p: any, i: number) => {
@@ -86,16 +56,18 @@ export function Preview({ panels }: any) {
             const tap = p.fx.find((f: any) => f.type === 'tap' && f.on);
             const loop = p.fx.find((f: any) => f.type === 'loop' && f.on);
             const pace = p.fx.find((f: any) => f.type === 'pacing' && f.on);
+            const trans = p.fx.find((f: any) => f.type === 'transition' && f.on);
             return (
               <section key={p.id} ref={(el: HTMLElement | null) => { panelRefs.current[p.id] = el; }}
                 className="ww-rpanel" data-motion={reveal ? reveal.params.Motion : 'Fade'}
-                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px' } as any}>
-                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} /></div>
+                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px', '--rev-ease': mapEasing(reveal ? reveal.params.Easing : 'ease-out') } as any}>
+                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} loopDensity={loop ? loop.params.Density : 55} loopSpeed={loop ? loop.params.Speed : 1} /></div>
                 <div className="ww-rpanel-grade" />
                 {p.dialogue
                   ? <div className="ww-rev ww-rdlg"><span className="ww-rdlg-name">{p.speaker}</span>{p.dialogue}</div>
                   : p.caption ? <div className="ww-rev ww-rcap">{p.caption}</div> : null}
-                {pace && <div className="ww-rev ww-rpace">{pace.params.Mode} · {pace.params.Length}s</div>}
+                {pace && <div className={cx('ww-rev ww-rpace', holdingId === p.id && 'is-holding')}>{pace.params.Mode} · {pace.params.Length}s</div>}
+                {trans && <div className="ww-rtrans" data-trans={trans.params.Type} />}
                 {tap && (
                   <button className={cx('ww-hotspot', taps[p.id] && 'is-done')} onClick={() => setTaps(t => ({ ...t, [p.id]: !t[p.id] }))}>
                     <span className="ww-hot-ring" />
