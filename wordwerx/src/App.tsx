@@ -11,6 +11,7 @@ import { Library, Story, Publish } from './stages';
 import { Series } from './series';
 import { Narrative } from './narrative';
 import { VisualDev } from './visdev';
+import { LoraManager } from './loras';
 
 const TWEAK_DEFAULTS = {
   canvasModel: 'filmstrip',
@@ -27,7 +28,7 @@ const NAV = [
     { id: 'cast', label: 'Characters' }, { id: 'arcs', label: 'Seasons' }, { id: 'beats', label: 'Storyboard' }, { id: 'script', label: 'Script' },
   ]},
   { id: 'visual', label: 'Visual Dev', glyph: '◎', single: false, children: [
-    { id: 'board', label: 'Prototype board' }, { id: 'sheets', label: 'Model sheets' },
+    { id: 'board', label: 'Prototype board' }, { id: 'sheets', label: 'Model sheets' }, { id: 'loras', label: 'LoRAs' },
   ]},
   { id: 'production', label: 'Production', glyph: '▦', single: false, children: [
     { id: 'story', label: 'Story' }, { id: 'library', label: 'Library' }, { id: 'compose', label: 'Compose' }, { id: 'preview', label: 'Preview' }, { id: 'publish', label: 'Publish' },
@@ -154,9 +155,11 @@ export default function App() {
         <div className={cx('ww-stagewrap', showCop && 'has-cop')}>
           <main className="ww-stage">
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} flash={flash} />}
-            {ws !== 'series' && !isEcho && <PlaceholderWS s={activeObj} onManage={() => setWs('series')} />}
+            {/* LoRA manager is cross-series — render it for any active series. */}
+            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager flash={flash} />}
+            {ws !== 'series' && !isEcho && !(ws === 'visual' && (subs as any).visual === 'loras') && <PlaceholderWS s={activeObj} onManage={() => setWs('series')} />}
             {ws === 'narrative' && isEcho && <Narrative panels={panels} setPanels={setPanels} episode={EPISODE} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} />}
-            {ws === 'visual' && isEcho && <VisualDev tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} />}
+            {ws === 'visual' && isEcho && (subs as any).visual !== 'loras' && <VisualDev tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} />}
             {ws === 'production' && isEcho && (
               (subs as any).production === 'story' ? <Story panels={panels} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} /> :

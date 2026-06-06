@@ -12,9 +12,15 @@ dist
 dist-ssr
 *.local
 
+# Secrets — never commit
+server/.env
+.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/restart-dev.ps1
 .idea
 .DS_Store
 *.suo

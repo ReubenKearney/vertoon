@@ -3,22 +3,40 @@ import { cx } from './ui';
 import { AssetThumb, StateDot } from './ui';
 import { CHARACTERS, EPISODE } from './data';
 import { Scene } from './scenes';
+import { USE_CASES, txt2imgFlux, txt2imgSDXL, datasetBatch, type UseCase } from './workflows';
+import { generate as runGenerate, imageSrc, listLoras, type Lora } from './services/runpod';
 
 export function Library({ library, setLibrary, onUseAsset }: any) {
   const [filter, setFilter] = React.useState('All');
   const [prompt, setPrompt] = React.useState('Sulawesi access tunnel, wet concrete, single failing lamp, lethal night outside, dusk-to-indigo grade');
   const [busy, setBusy] = React.useState(false);
+  const [useCase, setUseCase] = React.useState<UseCase>('txt2img-flux');
+  const [lora, setLora] = React.useState('');
+  const [loras, setLoras] = React.useState<Lora[]>([]);
+  const [status, setStatus] = React.useState<string | null>(null);
   const kinds = ['All', 'Background', 'Character', 'Prop', 'FX plate'];
   const shown = library.filter((a: any) => filter === 'All' || a.kind === filter);
 
-  function generate() {
-    setBusy(true);
-    const ids = [0, 1, 2].map(i => ({ id: 'g' + Math.random().toString(36).slice(2, 6), kind: 'Background', scene: ['tunnels', 'lantern_hub', 'night_lockdown'][i], name: 'Gen · ' + prompt.split(',')[0].slice(0, 22), source: 'AI', tags: ['new'], state: 'Queued' }));
-    setLibrary((l: any[]) => [...ids, ...l]);
-    ids.forEach((g, i) => setTimeout(() => {
-      setLibrary((l: any[]) => l.map((a: any) => a.id === g.id ? { ...a, state: 'Generated' } : a));
-      if (i === 2) setBusy(false);
-    }, 700 + i * 700));
+  React.useEffect(() => { listLoras().then(setLoras).catch(() => {}); }, []);
+
+  function buildWorkflow() {
+    const loraRef = lora ? { name: lora, strength: 0.9 } : undefined;
+    if (useCase === 'txt2img-sdxl') return txt2imgSDXL({ positive: prompt, lora: loraRef });
+    if (useCase === 'dataset-batch') return datasetBatch({ positive: prompt, count: 8, lora: loraRef });
+    return txt2imgFlux({ positive: prompt, lora: loraRef });
+  }
+
+  async function generate() {
+    setBusy(true); setStatus('Submitting…');
+    const ph = { id: 'g' + Math.random().toString(36).slice(2, 6), kind: 'Background', scene: 'tunnels', name: 'Gen · ' + prompt.split(',')[0].slice(0, 22), source: 'AI', tags: ['new'], state: 'Queued' };
+    setLibrary((l: any[]) => [ph, ...l]);
+    try {
+      const images = await runGenerate(buildWorkflow(), { onStatus: setStatus });
+      const url = images[0] ? imageSrc(images[0]) : undefined;
+      setLibrary((l: any[]) => l.map((a: any) => a.id === ph.id ? { ...a, state: 'Generated', imageUrl: url } : a));
+    } catch (e: any) {
+      setLibrary((l: any[]) => l.map((a: any) => a.id === ph.id ? { ...a, state: 'Rejected', error: e.message } : a));
+    } finally { setBusy(false); setStatus(null); }
   }
 
   return (
@@ -26,9 +44,16 @@ export function Library({ library, setLibrary, onUseAsset }: any) {
       <div className="ww-gen">
         <div className="ww-gen-head"><span className="ww-cop-orb" /> Generate art</div>
         <textarea className="ww-gen-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} />
-        <div className="ww-gen-row">
-          <div className="ww-gen-style">Style lock: <b>Echo dusk key</b> · indigo shadow / amber lamp</div>
-          <button className={cx('ww-gen-btn', busy && 'is-busy')} onClick={generate} disabled={busy}>{busy ? 'Generating…' : '✦ Generate 3'}</button>
+        <div className="ww-gen-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <select className="ww-filter" value={useCase} onChange={e => setUseCase(e.target.value as UseCase)} title="Workflow">
+            {USE_CASES.filter(u => !u.needsRefImage).map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
+          </select>
+          <select className="ww-filter" value={lora} onChange={e => setLora(e.target.value)} title="Character LoRA">
+            <option value="">No LoRA</option>
+            {loras.map(l => <option key={l.name} value={l.name}>{l.name.replace('.safetensors', '')}</option>)}
+          </select>
+          <div className="ww-gen-style">{status ? status : <>Style lock: <b>Echo dusk key</b></>}</div>
+          <button className={cx('ww-gen-btn', busy && 'is-busy')} onClick={generate} disabled={busy}>{busy ? 'Generating…' : '✦ Generate'}</button>
         </div>
       </div>
       <div className="ww-lib-bar">
@@ -37,7 +62,7 @@ export function Library({ library, setLibrary, onUseAsset }: any) {
       </div>
       <div className="ww-libgrid">
         {shown.map((a: any) => (
-          <AssetThumb key={a.id} scene={a.scene} label={a.name} sub={a.kind} source={a.source} state={a.state} onClick={() => onUseAsset && onUseAsset(a)} />
+          <AssetThumb key={a.id} scene={a.scene} label={a.name} sub={a.kind} source={a.source} state={a.state} imageUrl={a.imageUrl} onClick={() => onUseAsset && onUseAsset(a)} />
         ))}
       </div>
       <div className="ww-cast">

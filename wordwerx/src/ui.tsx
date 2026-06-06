@@ -28,10 +28,14 @@ export function StateDot({ state }: { state: string }) {
   return <span className="ww-state"><i style={{ background: `oklch(0.72 0.16 ${hue})` }} />{state}</span>;
 }
 
-export function AssetThumb({ scene, label, sub, source, state, onClick, selected, tall }: any) {
+export function AssetThumb({ scene, label, sub, source, state, onClick, selected, tall, imageUrl }: any) {
   return (
     <button className={cx('ww-thumb', selected && 'is-sel', tall && 'is-tall')} onClick={onClick}>
-      <div className="ww-thumb-art"><Scene kind={scene} /></div>
+      <div className="ww-thumb-art">
+        {imageUrl
+          ? <img src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          : <Scene kind={scene} />}
+      </div>
       <div className="ww-thumb-meta">
         <div className="ww-thumb-top">
           {source && <span className={cx('ww-src', source === 'AI' && 'is-ai')}>{source === 'AI' ? '✦ AI' : source}</span>}

@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "WORDWERX: Restart dev server + open Chrome",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "C:\\vertoons\\vertoon\\wordwerx\\.vscode\\restart-dev.ps1"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true,
+        "focus": true
+      },
+      "problemMatcher": [],
+      "detail": "Kills any existing companion server/Vite on ports 8787 & 5173 (no duplicate sessions), runs npm run dev:all, and opens the app in a new Chrome window."
+    }
+  ]
+}
