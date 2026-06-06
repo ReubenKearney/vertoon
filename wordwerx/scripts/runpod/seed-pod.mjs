@@ -16,6 +16,9 @@ const SETS = {
   sdxl: [
     ['checkpoints', 'sd_xl_base_1.0.safetensors', 'https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors'],
   ],
+  controlnet: [
+    ['controlnet', 'flux-canny-controlnet.safetensors', 'https://huggingface.co/InstantX/FLUX.1-dev-Controlnet-Canny/resolve/main/diffusion_pytorch_model.safetensors'],
+  ],
   flux: [
     ['unet', 'flux1-dev.safetensors', 'https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors'],
     ['vae', 'ae.safetensors', 'https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors'],

@@ -106,14 +106,14 @@ export function perspectiveConsistent(p: {
   refImageName: string;
   positive: string;
   negative?: string;
-  controlType?: 'lineart' | 'depth';
+  controlType?: 'canny' | 'depth';
   strength?: number;
   seed?: number;
 }): Record<string, any> {
   const seed = p.seed ?? rnd();
   const pre = p.controlType === 'depth'
     ? { class_type: 'DepthAnythingV2Preprocessor', inputs: { image: ['1', 0], resolution: 1024 } }
-    : { class_type: 'LineArtPreprocessor', inputs: { image: ['1', 0], resolution: 1024, coarse: 'disable' } };
+    : { class_type: 'CannyEdgePreprocessor', inputs: { image: ['1', 0], low_threshold: 100, high_threshold: 200, resolution: 1024 } };
   const cnModel = p.controlType === 'depth' ? 'flux-depth-controlnet.safetensors' : 'flux-canny-controlnet.safetensors';
   return {
     '1': { class_type: 'LoadImage', inputs: { image: p.refImageName } },
