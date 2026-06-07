@@ -12,6 +12,8 @@ import { Series } from './series';
 import { Narrative } from './narrative';
 import { VisualDev } from './visdev';
 import { LoraManager } from './loras';
+import { useOnline, canGenerate } from './services/online';
+import { getState, patchState, setLink as apiSetLink, type StoreLinks } from './services/store';
 
 const TWEAK_DEFAULTS = {
   canvasModel: 'filmstrip',
@@ -28,7 +30,7 @@ const NAV = [
     { id: 'cast', label: 'Characters' }, { id: 'arcs', label: 'Seasons' }, { id: 'beats', label: 'Storyboard' }, { id: 'script', label: 'Script' },
   ]},
   { id: 'visual', label: 'Visual Dev', glyph: '◎', single: false, children: [
-    { id: 'board', label: 'Prototype board' }, { id: 'sheets', label: 'Model sheets' }, { id: 'loras', label: 'LoRAs' },
+    { id: 'board', label: 'Prototype board' }, { id: 'sheets', label: 'Model sheets' }, { id: 'locations', label: 'Locations' }, { id: 'loras', label: 'LoRAs' },
   ]},
   { id: 'production', label: 'Production', glyph: '▦', single: false, children: [
     { id: 'story', label: 'Story' }, { id: 'library', label: 'Library' }, { id: 'compose', label: 'Compose' }, { id: 'preview', label: 'Preview' }, { id: 'publish', label: 'Publish' },
@@ -51,6 +53,53 @@ export default function App() {
   const [copilot, setCopilot] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const [visualSelId, setVisualSelId] = React.useState<string | null>(null);
+  // Offline-first: generation gated by reachability; everything else always works.
+  const onlineState = useOnline();
+  const online = canGenerate(onlineState);
+  const [links, setLinks] = React.useState<StoreLinks | null>(null);
+  const [appearance, setAppearance] = React.useState<Record<string, string>>({});
+  const [visdevExtra, setVisdevExtra] = React.useState<any>({});
+  const [hydrated, setHydrated] = React.useState(false);
+
+  // Hydrate persisted state + links from the local store on load.
+  React.useEffect(() => {
+    getState()
+      .then(({ links, state }) => {
+        setLinks(links);
+        setAppearance(state.appearance || {});
+        setVisdevExtra(state.visdevExtra || {});
+        if (state.library && state.library.length) setLibrary(state.library);
+      })
+      .catch(() => {})
+      .finally(() => setHydrated(true));
+  }, []);
+
+  // Persist a Visual Dev snapshot (variants + locks + image links) for offline reload.
+  function persistVisdev(snapshot: any) {
+    setVisdevExtra(snapshot);
+    patchState({ state: { visdevExtra: snapshot } }).catch(() => {});
+  }
+
+  // Persist the library (seed + generated) after hydration, debounced.
+  React.useEffect(() => {
+    if (!hydrated) return;
+    const id = setTimeout(() => { patchState({ state: { library } }).catch(() => {}); }, 600);
+    return () => clearTimeout(id);
+  }, [library, hydrated]);
+
+  // Persist + reflect a link change (character LoRA, canonical, portrait, …).
+  function updateLink(category: keyof StoreLinks, key: string, value: unknown) {
+    setLinks(l => (l ? { ...l, [category]: { ...(l as any)[category], [key]: value } } : l));
+    apiSetLink(category, key, value).catch(() => {});
+  }
+  // Persist + reflect a character's appearance text.
+  function updateAppearance(charId: string, text: string) {
+    setAppearance(a => {
+      const next = { ...a, [charId]: text };
+      patchState({ state: { appearance: next } }).catch(() => {});
+      return next;
+    });
+  }
 
   const activeObj = series.find(s => s.id === activeSeries) || series[0];
   const isEcho = activeSeries === 'echo';
@@ -156,16 +205,16 @@ export default function App() {
           <main className="ww-stage">
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
-            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager flash={flash} />}
+            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager flash={flash} updateLink={updateLink} />}
             {ws !== 'series' && !isEcho && !(ws === 'visual' && (subs as any).visual === 'loras') && <PlaceholderWS s={activeObj} onManage={() => setWs('series')} />}
-            {ws === 'narrative' && isEcho && <Narrative panels={panels} setPanels={setPanels} episode={EPISODE} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} />}
-            {ws === 'visual' && isEcho && (subs as any).visual !== 'loras' && <VisualDev tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} />}
+            {ws === 'narrative' && isEcho && <Narrative panels={panels} setPanels={setPanels} episode={EPISODE} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'visual' && isEcho && (subs as any).visual !== 'loras' && <VisualDev tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && isEcho && (
               (subs as any).production === 'story' ? <Story panels={panels} /> :
-              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} /> :
+              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} /> :
               (subs as any).production === 'compose' ? <Compose panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} /> :
               (subs as any).production === 'preview' ? <Preview panels={panels} /> :
-              <Publish panels={panels} />
+              <Publish panels={panels} library={library} links={links} updateLink={updateLink} flash={flash} />
             )}
           </main>
           {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={EPISODE} />}

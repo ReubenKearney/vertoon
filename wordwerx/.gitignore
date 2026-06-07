@@ -16,6 +16,9 @@ dist-ssr
 server/.env
 .env
 
+# Local asset store (generated images + db.json)
+server/store
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

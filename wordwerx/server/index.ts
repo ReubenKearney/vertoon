@@ -8,25 +8,69 @@ import { dirname, join } from 'node:path';
 loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), '.env') });
 import express from 'express';
 import multer from 'multer';
+import { createReadStream } from 'node:fs';
 import { submitRun, getStatus, cancelJob } from './runpod.js';
 import { listLoras, uploadLora, uploadTrainingImage, deleteLora } from './loras.js';
 import { buildTrainWorkflow } from './train-workflow.js';
+import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, isLinkKey, assetCount } from './store.js';
 
 const app = express();
-app.use(express.json({ limit: '25mb' }));
+// Larger limit: /api/assets receives base64 images.
+app.use(express.json({ limit: '60mb' }));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 * 1024 } });
 
 const wrap = (fn: express.RequestHandler): express.RequestHandler =>
   (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // --- Health ------------------------------------------------------------------
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', wrap(async (_req, res) => {
   res.json({
     ok: true,
     endpoint: Boolean(process.env.RUNPOD_ENDPOINT_ID),
     s3: Boolean(process.env.RUNPOD_NETWORK_VOLUME_ID),
+    store: true,
+    assetCount: await assetCount(),
   });
-});
+}));
+
+// --- Asset store (offline-first: bytes live on the local server) -------------
+// Save a generated image (data URL / base64 / http|s3 url) -> { id, url }.
+app.post('/api/assets', wrap(async (req, res) => {
+  const { image, origin } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'image is required' });
+  res.json(await saveAsset(image, origin));
+}));
+
+app.get('/api/assets/:id', wrap(async (req, res) => {
+  const a = await getAsset(req.params.id);
+  if (!a) return res.status(404).json({ error: 'not found' });
+  res.setHeader('Content-Type', a.mime);
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  createReadStream(a.path).pipe(res);
+}));
+
+app.delete('/api/assets/:id', wrap(async (req, res) => {
+  await deleteAsset(req.params.id);
+  res.json({ ok: true });
+}));
+
+// --- Persisted app state + links (hydration source of truth) -----------------
+app.get('/api/state', wrap(async (_req, res) => { res.json(await getState()); }));
+
+app.patch('/api/state', wrap(async (req, res) => {
+  await patchState(req.body || {});
+  res.json({ ok: true });
+}));
+
+// Set one link entry, e.g. POST /api/links/characterLora { key, value }.
+app.post('/api/links/:category', wrap(async (req, res) => {
+  const { category } = req.params;
+  if (!isLinkKey(category)) return res.status(400).json({ error: 'unknown link category' });
+  const { key, value } = req.body || {};
+  if (!key) return res.status(400).json({ error: 'key is required' });
+  await setLink(category, key, value);
+  res.json({ ok: true });
+}));
 
 // --- Generation --------------------------------------------------------------
 // Body: { workflow, images? } -> { jobId }

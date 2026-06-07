@@ -80,6 +80,25 @@ Smoke-tested end to end: both **SDXL** and **Flux** txt2img return valid PNGs vi
 raw `/run` and the companion server's `/api/generate`; LoRA **upload → list →
 delete** verified through `/api/loras`.
 
+## Local asset store / offline-first
+
+The companion server doubles as a local, offline asset store so editing/preview/
+publishing work without internet (only generation needs the cloud GPU).
+
+- Generated image bytes are saved to `server/store/assets/<id>.png`; the app
+  references compact `/api/assets/<id>` URLs, never base64.
+- App state deltas + links (character→LoRA, portraits, locked canonicals, panel
+  art) persist in `server/store/db.json` and re-hydrate on refresh.
+- Routes: `POST/GET/DELETE /api/assets[/:id]`, `GET/PATCH /api/state`,
+  `POST /api/links/:category`; `/api/health` reports `{store, assetCount}`.
+- `STORE_DIR` (in `server/.env`, default `store`) sets the location. The dir is
+  gitignored.
+- **Publish** (`src/services/publish.ts`) inlines each panel's assigned image as
+  base64 into one self-contained `.html` with baked scroll-reveal → opens offline.
+- Training jobs write a `.safetensors` (no image), so the worker reports "no
+  outputs"/FAILED even on success — the train UI verifies success by the LoRA
+  appearing and uses the real `<name>_rank{N}_bf16.safetensors` filename.
+
 ## Gotchas learned (baked into the scripts)
 
 - **Invoke host is `api.runpod.ai`** (not `api.runpod.io`, which is only the

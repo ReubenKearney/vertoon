@@ -6,7 +6,7 @@ import { listLoras, uploadLora, trainLora, generate, pollJob, type Lora } from '
 // LoRA Manager — list, upload existing .safetensors, and train a new LoRA from
 // a character's image set. Trained/uploaded LoRAs land on the network volume
 // and become selectable everywhere generation happens.
-export function LoraManager({ flash }: { flash?: (m: string) => void }) {
+export function LoraManager({ flash, updateLink }: { flash?: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void }) {
   const [loras, setLoras] = React.useState<Lora[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
@@ -59,7 +59,7 @@ export function LoraManager({ flash }: { flash?: (m: string) => void }) {
         </div>
       )}
 
-      {tab === 'train' && <TrainPanel onDone={(m) => { note(m); refresh(); setTab('library'); }} onError={setErr} />}
+      {tab === 'train' && <TrainPanel updateLink={updateLink} onDone={(m) => { note(m); refresh(); setTab('library'); }} onError={setErr} />}
     </div>
   );
 }
@@ -74,7 +74,7 @@ function UploadButton({ onPick }: { onPick: (f: File) => void }) {
   );
 }
 
-function TrainPanel({ onDone, onError }: { onDone: (m: string) => void; onError: (m: string) => void }) {
+function TrainPanel({ onDone, onError, updateLink }: { onDone: (m: string) => void; onError: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void }) {
   const [name, setName] = React.useState('');
   const [character, setCharacter] = React.useState(CHARACTERS[0]?.id || '');
   const [trigger, setTrigger] = React.useState('');
@@ -90,14 +90,20 @@ function TrainPanel({ onDone, onError }: { onDone: (m: string) => void; onError:
     if (files.length < 5) return onError('Add at least ~5 training images (10–25 recommended).');
     setBusy(true); setStatus('Uploading dataset…');
     try {
-      const { jobId, expectedLora } = await trainLora(
-        { name, triggerWord: trigger || name, steps, rank },
-        files,
-      );
+      const { jobId } = await trainLora({ name, triggerWord: trigger || name, steps, rank }, files);
       setStatus('Training… this can take a while');
-      // Reuse the generic poller via the generate service’s job endpoint.
-      await pollJob(jobId, { onTick: s => setStatus(`Training: ${s.status}`), timeoutMs: 4 * 60 * 60 * 1000 });
-      onDone(`Trained ${expectedLora}`);
+      // The training job writes a .safetensors (no image), so the worker reports
+      // "no outputs" / FAILED even on success — verify by the LoRA appearing.
+      try { await pollJob(jobId, { onTick: s => setStatus(`Training: ${s.status}`), timeoutMs: 4 * 60 * 60 * 1000 }); }
+      catch { /* expected for training jobs — fall through to volume check */ }
+      // FluxTrainer names the output "<name>_rank<N>_bf16.safetensors"; prefer the final (non -step) file.
+      const produced = (await listLoras()).map(l => l.name)
+        .filter(n => n.startsWith(name) && !/-step\d+\.safetensors$/.test(n))
+        .sort();
+      const finalName = produced[produced.length - 1];
+      if (!finalName) throw new Error('Training finished but no LoRA was produced — check the dataset.');
+      if (character) updateLink?.('characterLora', character, { loraName: finalName, triggerWord: trigger || name });
+      onDone(`Trained ${finalName}`);
     } catch (e: any) { onError(e.message); }
     finally { setBusy(false); setStatus(null); }
   }

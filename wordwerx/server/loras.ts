@@ -56,7 +56,8 @@ export interface LoraEntry { name: string; size: number; lastModified?: string }
 export async function listLoras(): Promise<LoraEntry[]> {
   const out = await client().send(new ListObjectsV2Command({ Bucket: bucket(), Prefix: LORA_PREFIX }));
   return (out.Contents || [])
-    .filter(o => o.Key && o.Key.endsWith('.safetensors'))
+    // .safetensors only, and hide FluxTrainer intermediate "-stepNNNNN" checkpoints.
+    .filter(o => o.Key && o.Key.endsWith('.safetensors') && !/-step\d+\.safetensors$/.test(o.Key))
     .map(o => ({
       name: o.Key!.slice(LORA_PREFIX.length),
       size: o.Size || 0,

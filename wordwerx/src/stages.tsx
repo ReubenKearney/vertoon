@@ -3,59 +3,33 @@ import { cx } from './ui';
 import { AssetThumb, StateDot } from './ui';
 import { CHARACTERS, EPISODE } from './data';
 import { Scene } from './scenes';
-import { USE_CASES, txt2imgFlux, txt2imgSDXL, datasetBatch, type UseCase } from './workflows';
-import { generate as runGenerate, imageSrc, listLoras, type Lora } from './services/runpod';
+import { GenerationPanel, type GenResult } from './components/GenerationPanel';
+import type { UseCase } from './workflows';
+import { assetUrl, assetIdOf } from './services/store';
+import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
 
-export function Library({ library, setLibrary, onUseAsset }: any) {
+export function Library({ library, setLibrary, onUseAsset, online, flash }: any) {
   const [filter, setFilter] = React.useState('All');
-  const [prompt, setPrompt] = React.useState('Sulawesi access tunnel, wet concrete, single failing lamp, lethal night outside, dusk-to-indigo grade');
-  const [busy, setBusy] = React.useState(false);
-  const [useCase, setUseCase] = React.useState<UseCase>('txt2img-flux');
-  const [lora, setLora] = React.useState('');
-  const [loras, setLoras] = React.useState<Lora[]>([]);
-  const [status, setStatus] = React.useState<string | null>(null);
   const kinds = ['All', 'Background', 'Character', 'Prop', 'FX plate'];
   const shown = library.filter((a: any) => filter === 'All' || a.kind === filter);
 
-  React.useEffect(() => { listLoras().then(setLoras).catch(() => {}); }, []);
-
-  function buildWorkflow() {
-    const loraRef = lora ? { name: lora, strength: 0.9 } : undefined;
-    if (useCase === 'txt2img-sdxl') return txt2imgSDXL({ positive: prompt, lora: loraRef });
-    if (useCase === 'dataset-batch') return datasetBatch({ positive: prompt, count: 8, lora: loraRef });
-    return txt2imgFlux({ positive: prompt, lora: loraRef });
-  }
-
-  async function generate() {
-    setBusy(true); setStatus('Submitting…');
-    const ph = { id: 'g' + Math.random().toString(36).slice(2, 6), kind: 'Background', scene: 'tunnels', name: 'Gen · ' + prompt.split(',')[0].slice(0, 22), source: 'AI', tags: ['new'], state: 'Queued' };
-    setLibrary((l: any[]) => [ph, ...l]);
-    try {
-      const images = await runGenerate(buildWorkflow(), { onStatus: setStatus });
-      const url = images[0] ? imageSrc(images[0]) : undefined;
-      setLibrary((l: any[]) => l.map((a: any) => a.id === ph.id ? { ...a, state: 'Generated', imageUrl: url } : a));
-    } catch (e: any) {
-      setLibrary((l: any[]) => l.map((a: any) => a.id === ph.id ? { ...a, state: 'Rejected', error: e.message } : a));
-    } finally { setBusy(false); setStatus(null); }
+  function onResult(assets: GenResult[], ctx: { useCase: UseCase; prompt: string }) {
+    const base = ctx.prompt.split(',')[0].slice(0, 22) || 'untitled';
+    const rows = assets.map((a, i) => ({
+      id: 'g' + a.id.slice(0, 8), kind: 'Background', scene: 'tunnels',
+      name: 'Gen · ' + base + (assets.length > 1 ? ` ${i + 1}` : ''),
+      source: 'AI', tags: ['new'], state: 'Generated', imageUrl: a.url,
+    }));
+    setLibrary((l: any[]) => [...rows, ...l]);
   }
 
   return (
     <div className="ww-library">
-      <div className="ww-gen">
-        <div className="ww-gen-head"><span className="ww-cop-orb" /> Generate art</div>
-        <textarea className="ww-gen-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} />
-        <div className="ww-gen-row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <select className="ww-filter" value={useCase} onChange={e => setUseCase(e.target.value as UseCase)} title="Workflow">
-            {USE_CASES.filter(u => !u.needsRefImage).map(u => <option key={u.id} value={u.id}>{u.label}</option>)}
-          </select>
-          <select className="ww-filter" value={lora} onChange={e => setLora(e.target.value)} title="Character LoRA">
-            <option value="">No LoRA</option>
-            {loras.map(l => <option key={l.name} value={l.name}>{l.name.replace('.safetensors', '')}</option>)}
-          </select>
-          <div className="ww-gen-style">{status ? status : <>Style lock: <b>Echo dusk key</b></>}</div>
-          <button className={cx('ww-gen-btn', busy && 'is-busy')} onClick={generate} disabled={busy}>{busy ? 'Generating…' : '✦ Generate'}</button>
-        </div>
-      </div>
+      <GenerationPanel
+        workflows={['txt2img-flux', 'txt2img-sdxl', 'dataset-batch']}
+        initialPrompt="Sulawesi access tunnel, wet concrete, single failing lamp, lethal night outside, dusk-to-indigo grade"
+        showLora online={online} flash={flash} onResult={onResult}
+      />
       <div className="ww-lib-bar">
         <div className="ww-filters">{kinds.map(k => <button key={k} className={cx('ww-filter', filter === k && 'is-on')} onClick={() => setFilter(k)}>{k}</button>)}</div>
         <span className="ww-lib-count">{shown.length} assets</span>
@@ -127,44 +101,73 @@ export function Story({ panels }: any) {
   );
 }
 
-export function Publish({ panels }: any) {
-  const [pubbed, setPubbed] = React.useState(false);
-  const [opt, setOpt] = React.useState(true);
-  const fxCount = panels.reduce((n: number, p: any) => n + p.fx.length, 0);
+export function Publish({ panels, library, links, updateLink, flash }: any) {
+  const story = (panels || []).filter((p: any) => p.scene !== 'parallax_demo');
+  const panelImage: Record<string, string> = links?.panelImage || {};
+  const artAssets = (library || []).filter((a: any) => a.imageUrl);
+  const [downscale, setDownscale] = React.useState(true);
+  const [busy, setBusy] = React.useState(false);
+  const [result, setResult] = React.useState<{ bytes: number; withArt: number } | null>(null);
+  const assigned = story.filter((p: any) => panelImage[p.id]).length;
+
+  function assign(panelId: string, imageUrl: string) { updateLink?.('panelImage', panelId, assetIdOf(imageUrl)); }
+
+  async function exportComic() {
+    setBusy(true);
+    try {
+      const pp: PublishPanel[] = story.map((p: any, i: number) => ({ id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360 }));
+      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: EPISODE.title, series: EPISODE.series, panelImage, downscale });
+      downloadHtml(html, `echos-location-ep01.html`);
+      setResult({ bytes, withArt });
+      flash?.(`Exported offline comic · ${(bytes / 1e6).toFixed(2)} MB`);
+    } catch (e: any) { flash?.('Export failed: ' + e.message); }
+    finally { setBusy(false); }
+  }
+
   return (
     <div className="ww-publish">
       <div className="ww-pub-main">
         <div className="ww-pv-kicker">Publish</div>
         <h2>Ship "{EPISODE.title}"</h2>
-        <p className="ww-pub-sub">Bundle the episode as a single self-contained web page — effects baked in, opens offline, share by link or file.</p>
+        <p className="ww-pub-sub">Export the episode as a single self-contained <b>.html</b> — every assigned image is inlined and the scroll-reveal is baked in, so it opens offline with no external requests.</p>
         <div className="ww-pub-stats">
-          <div><b>{panels.length}</b><span>panels</span></div>
-          <div><b>{fxCount}</b><span>effects</span></div>
-          <div><b>{opt ? '~0.4' : '2.1'}MB</b><span>first paint</span></div>
-          <div><b>16:9 → 9:19</b><span>vertical</span></div>
+          <div><b>{story.length}</b><span>panels</span></div>
+          <div><b>{assigned}</b><span>with art</span></div>
+          <div><b>{result ? (result.bytes / 1e6).toFixed(2) + 'MB' : '—'}</b><span>export size</span></div>
+          <div><b>9:19</b><span>vertical</span></div>
         </div>
-        <label className="ww-pub-opt"><input type="checkbox" checked={opt} onChange={e => setOpt(e.target.checked)} /><span><b>Lazy-load FX plates</b> — first paint under 400KB, effects stream in as the reader scrolls.</span></label>
-        <div className="ww-pub-format">
-          <div className="ww-pub-fmt is-on"><b>Self-contained web page</b><span>.html · one file</span><i>✓</i></div>
-          <div className="ww-pub-fmt"><b>Embeddable widget</b><span>iframe snippet</span></div>
-          <div className="ww-pub-fmt"><b>Static fallback</b><span>poster image</span></div>
-        </div>
-        <button className={cx('ww-pub-go', pubbed && 'is-done')} onClick={() => setPubbed(true)}>{pubbed ? '✓ Published' : 'Publish episode'}</button>
-        {pubbed && (
+        <label className="ww-pub-opt"><input type="checkbox" checked={downscale} onChange={e => setDownscale(e.target.checked)} /><span><b>Downscale images</b> — re-encode to ≤1080px JPEG to keep the file small.</span></label>
+        <button className={cx('ww-pub-go', busy && 'is-done')} disabled={busy} onClick={exportComic}>{busy ? 'Exporting…' : '⤓ Export offline comic (.html)'}</button>
+        {result && (
           <div className="ww-pub-link">
-            <code>vertoon.local/echos-location/ep-01</code>
-            <button onClick={() => {}}>Copy link</button>
+            <code>echos-location-ep01.html · {result.withArt}/{story.length} panels with art · {(result.bytes / 1e6).toFixed(2)} MB</code>
           </div>
         )}
+        <div className="ww-insp-sub" style={{ marginTop: 26, marginBottom: 10 }}>Assign panel art · {assigned}/{story.length}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflow: 'auto' }}>
+          {story.map((p: any) => (
+            <div key={p.id} className="ww-vd-pending-row">
+              <div className="ww-vd-pending-th">{panelImage[p.id] ? <img src={assetUrl(panelImage[p.id])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scene kind={p.scene} />}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{String(p.n).padStart(2, '0')} · {p.slug}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink3)', fontFamily: 'var(--font-mono)' }}>{p.beat}</div>
+              </div>
+              <select className="ww-filter" value={panelImage[p.id] ? assetUrl(panelImage[p.id]) : ''} onChange={e => assign(p.id, e.target.value)} title="Panel art">
+                <option value="">{artAssets.length ? 'Pick art…' : 'No generated art yet'}</option>
+                {artAssets.map((a: any) => <option key={a.id} value={a.imageUrl}>{a.name}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="ww-pub-aside">
         <div className="ww-pub-poster">
-          <Scene kind="dusk_skyline" />
-          <div className="ww-pub-poster-meta"><span>Episode 01</span><b>Wrong Place, Right Voice</b><i>Echo's Location</i></div>
+          {assigned > 0 ? <img src={assetUrl(panelImage[story[0].id])} alt="" style={{ width: '100%', display: 'block' }} /> : <Scene kind="dusk_skyline" />}
+          <div className="ww-pub-poster-meta"><span>Episode 01</span><b>{EPISODE.title}</b><i>{EPISODE.series}</i></div>
         </div>
         <div className="ww-pub-share">
-          <div className="ww-insp-sub">Auto share copy</div>
-          <p>"The hour the city starts counting heads. A journalist, a lamplighter, and a voice with no face. Read it scrolling."</p>
+          <div className="ww-insp-sub">Offline-ready</div>
+          <p>Assign generated images to panels, then export. The .html bundles everything — open it on a plane, no server, no internet.</p>
         </div>
       </div>
     </div>

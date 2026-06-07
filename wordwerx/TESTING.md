@@ -84,14 +84,44 @@ Run **Tasks: Run Task → "WORDWERX: Restart dev server + open Chrome"**, then:
 - 2.3 LoRA-gen (SDXL + real `pixel-art-xl` LoRA) → ✅ PASS.
 - 2.4 expression-edit (Flux Kontext, ref image) → ✅ PASS (representative graph correct as-is).
 - 2.5 perspective-consistent (ControlNet) → ✅ **PASS**. Switched preprocessor to `CannyEdgePreprocessor` and seeded `flux-canny-controlnet.safetensors` (InstantX, streamed HF→S3). Full run: base image → canny → Flux ControlNet → output image.
-- 2.7 train-lora-flux (FluxTrainer) → 🔧 fixed 3 real graph bugs in `server/train-workflow.ts`:
-  1. numeric params were strings (caused 500) → build as object with numbers;
-  2. missing terminal output node → added `FluxTrainEnd`;
-  3. ~20 missing required inputs across Optimizer/Dataset/Init nodes → filled from FluxTrainer source defaults.
-  Now **passes full ComfyUI validation and reaches execution**, then fails at runtime inside the node: `InitFluxLoRATraining: 'FluxNetworkTrainer' object has no attribute 'num_train_epochs'`.
-  **Follow-up:** pin a known-good `ComfyUI-FluxTrainer` commit in the worker Dockerfile (or paste a known-good exported training graph) and re-run a short real-dataset train. Our graph wiring is otherwise correct.
+- 2.7 train-lora-flux (FluxTrainer) → ✅ **PASS** (see Tier 8). Fixed 3 real graph bugs in `server/train-workflow.ts`: numeric params were strings (caused a 500) → build as object with numbers; missing terminal output node → added `FluxTrainEnd`; ~20 missing required inputs → filled from FluxTrainer source defaults. The earlier `num_train_epochs` AttributeError was a **dataset artifact** of probing with an empty dataset path — `init_train` reads it (nodes.py:636) only after computing it from `len(train_dataloader)` (train_network.py:773). With a real dataset it computes fine. **No image rebuild needed.**
 
 ### Outstanding
 - Seed `models/ipadapter/` weights to enable IPAdapter workflows (no app workflow uses them yet).
-- Pin FluxTrainer version for 2.7; then a real short training run.
 - Tier 3 (UI) is manual via the run task.
+
+---
+
+## Tiers 5–9 — UI/UX × backend (offline-first)
+
+**Tier 5 — Store (free, automated):** ✅ all.
+- `POST /api/assets` → `{id,url}` writes `server/store/assets/<id>.png` + db row.
+- `GET /api/assets/:id` → bytes + `Content-Type`.
+- `PATCH /api/state` + `POST /api/links/*` merge; `GET /api/state` reflects them.
+- Survives **server restart** (db.json on disk); `/api/health` → `{store:true, assetCount}`.
+
+**Tier 6 — Offline (manual, the core requirement):**
+1. `npm run dev:all` (or the VS Code task). Generate in Library → confirm a file appears in `server/store/assets/`.
+2. Block `api.runpod.ai` (or pull Wi-Fi); keep the server running.
+3. Refresh → thumbnails / portraits / canonical / panel art re-render from `/api/assets/*` (hydrated from `/api/state`).
+4. Edit (rename, reorder, lock, appearance) persists; Preview renders the real images.
+5. Publish → Export offline comic `.html`; open it in airplane mode → renders, devtools Network shows **0 external requests**.
+6. Generate buttons show an "offline" badge and are disabled; re-enable when back online.
+
+**Tier 7 — Wired surfaces (manual, online):**
+- Library: prompt → workflow + LoRA → Generate → image renders; cancel works; failure → toast.
+- Visual Dev board: generate variant → appears with art; Reject; Lock → canonical recorded.
+- Visual Dev sheets: "Generate expressions" on a locked subject → Kontext edits the canonical → cells fill.
+- Visual Dev Locations: load a location image → "Generate angle" → gallery.
+- Narrative Bible: pick/assign a LoRA; "Generate portrait" → portrait shows in hero + roster, persists; LoRA flows into variant gen.
+- Publish: assign library art to panels → export.
+
+**Tier 8 — Training E2E:** ✅ **PASS** — real run: 5 generated images + 20 steps, rank 8, via `POST /api/loras/train` → reached `IN_PROGRESS` (past `init_train`) → FluxTrainer wrote `smoke_lora_rank8_bf16.safetensors` (76.7 MB) to `models/loras/`. Note: the worker-comfyui handler expects an **image** output, so a training job reports "no outputs"/FAILED even on success — the train UI therefore verifies success by the LoRA appearing (and uses the real `_rank{N}_bf16` filename), and `listLoras` hides intermediate `-stepNNNNN` checkpoints. Train UI writes the character→LoRA link on success.
+
+**Tier 9 — Non-functional:** `npm run build` clean (exit 0); no secrets in `dist/`; publish size shown is the real computed byte size (downscale option); `db.json` + assets survive restart.
+
+### Run log (Tiers 5–9)
+- Tier 5: ✅ automated (store POST/GET/state/links, restart-persistence).
+- Tier 8: ✅ real training run completed; LoRA written + listed.
+- Tiers 6, 7: ⏳ manual UI pass via the VS Code run task (offline + each surface).
+- Tier 9: ✅ build clean, no secrets in bundle.
