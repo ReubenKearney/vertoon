@@ -122,6 +122,8 @@ Run **Tasks: Run Task → "WORDWERX: Restart dev server + open Chrome"**, then:
 
 ### Run log (Tiers 5–9)
 - Tier 5: ✅ automated (store POST/GET/state/links, restart-persistence).
+- Tier 7 render smoke: ✅ via Preview MCP — every wired screen mounts with **zero console errors** (Library/Visdev inspector GenerationPanels, Locations, Bible LoRA+portrait, LoRA Manager, Publish with 12 panel-assign rows); a browser-driven Library generate reached IN_QUEUE/Cancel.
 - Tier 8: ✅ real training run completed; LoRA written + listed.
-- Tiers 6, 7: ⏳ manual UI pass via the VS Code run task (offline + each surface).
+- Tiers 6 (offline) + 7 interactions: ⏳ full manual pass via the VS Code run task.
 - Tier 9: ✅ build clean, no secrets in bundle.
+- Fix found via smoke: parent-injected `PORT` (e.g. preview=5173) collided with the companion server → made `server/.env` authoritative (`dotenv override:true`).

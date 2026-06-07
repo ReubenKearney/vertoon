@@ -4,8 +4,9 @@
 import { config as loadEnv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-// Load server/.env regardless of the process working directory.
-loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), '.env') });
+// Load server/.env regardless of CWD. override:true so server/.env (e.g. PORT)
+// wins over an ambient PORT injected by a parent (preview/launchers).
+loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), '.env'), override: true });
 import express from 'express';
 import multer from 'multer';
 import { createReadStream } from 'node:fs';
