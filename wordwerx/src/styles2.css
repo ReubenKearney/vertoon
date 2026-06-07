@@ -449,3 +449,35 @@ textarea.ww-input{resize:vertical;line-height:1.55;}
 .ww-offline{font-size:10px;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em;color:#f3b23c;background:color-mix(in oklab,#f3b23c 18%,transparent);padding:1px 7px;border-radius:10px;margin-left:8px;}
 .ww-gen-btn.is-offline{opacity:.5;cursor:not-allowed;box-shadow:none;}
 .ww-gen-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px;}
+
+/* Image lightbox */
+.ww-lightbox{position:fixed;inset:0;z-index:1000;background:rgba(6,7,12,.93);display:flex;align-items:center;justify-content:center;padding:40px;cursor:zoom-out;backdrop-filter:blur(3px);}
+.ww-lightbox img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:4px;box-shadow:0 24px 90px rgba(0,0,0,.65);cursor:default;}
+.ww-lightbox-x{position:fixed;top:18px;right:22px;width:42px;height:42px;border-radius:50%;background:var(--bg3);color:var(--ink);border:none;font-size:18px;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line2);z-index:1001;}
+.ww-lightbox-x:hover{background:var(--raise);}
+img.ww-zoomable{cursor:zoom-in;}
+
+/* Notification badge on the bell */
+.ww-nav-icon-btn{position:relative;}
+.ww-nav-badge{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font:700 10px/16px var(--font-mono);text-align:center;box-shadow:0 0 0 2px var(--bg2);}
+.ww-nav-badge.is-error{background:#ff5a4e;}
+
+/* Collapsible left navigator */
+.ww-app .ww-nav2{transition:margin-left .18s ease;}
+.ww-app.nav-collapsed .ww-nav2{margin-left:calc(-1 * var(--nav-w, 248px));}
+.ww-nav-collapse{position:absolute;top:14px;right:10px;width:24px;height:24px;border-radius:7px;background:transparent;color:var(--ink2);border:none;cursor:pointer;font-size:13px;}
+.ww-nav-collapse:hover{background:var(--bg3);color:var(--ink);}
+.ww-nav-reopen{position:fixed;top:14px;left:12px;z-index:60;width:34px;height:34px;border-radius:9px;background:var(--bg2);color:var(--ink);border:none;cursor:pointer;font-size:16px;box-shadow:inset 0 0 0 1px var(--line2);}
+.ww-nav-reopen:hover{background:var(--bg3);}
+
+/* Advanced settings disclosure */
+.ww-adv{margin-top:8px;border-radius:9px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);}
+.ww-adv-head{display:flex;align-items:center;gap:6px;width:100%;padding:8px 11px;background:none;border:none;color:var(--ink2);font:600 11.5px var(--font-ui);cursor:pointer;}
+.ww-adv-body{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;padding:4px 11px 12px;}
+.ww-adv-body label{display:grid;gap:3px;font:500 10.5px var(--font-mono);color:var(--ink3);}
+.ww-adv-body input,.ww-adv-body select{height:30px;border-radius:7px;background:var(--bg3);color:var(--ink);border:none;box-shadow:inset 0 0 0 1px var(--line);padding:0 8px;font-size:12px;}
+.ww-adv-full{grid-column:1 / -1;}
+
+/* Model sheet block header (title + generate button) */
+.ww-sheet-blockhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.ww-sheet-blockhead .ww-gen-btn{font-size:11px;padding:7px 13px;}

@@ -6,6 +6,7 @@ import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import { generate, imageSrc } from './services/runpod';
 import { expressionEdit } from './workflows';
 import { assetUrl, assetIdOf, loadAssetDataUrl, saveAsset } from './services/store';
+import { useUI } from './ui-context';
 
 const VIS_TABS = [
   { id: 'board', label: 'Prototype board', glyph: '▦' },
@@ -13,35 +14,34 @@ const VIS_TABS = [
   { id: 'locations', label: 'Locations', glyph: '⊞' },
 ];
 
-const STATE_META: Record<string, { label: string; color: string }> = {
-  Locked:    { label: 'Locked',    color: 'var(--accent2)' },
-  Candidate: { label: 'Candidate', color: '#f3b23c' },
-  Explored:  { label: 'Explored',  color: 'var(--ink3)' },
-  Rejected:  { label: 'Rejected',  color: '#ff7a6a' },
+const STATE_META: Record<string, { color: string }> = {
+  Locked: { color: 'var(--accent2)' }, Candidate: { color: '#f3b23c' },
+  Explored: { color: 'var(--ink3)' }, Rejected: { color: '#ff7a6a' },
 };
+const NEG_DEFAULT = 'lowres, bad anatomy, extra limbs, watermark, text, busy background';
 
 let __vdT: ReturnType<typeof setTimeout> | undefined;
 
+// Zoomable image (opens the global lightbox), with a Scene fallback.
+function Thumb({ url, scene, style }: { url?: string; scene?: string; style?: React.CSSProperties }) {
+  const ui = useUI();
+  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }} onClick={e => { e.stopPropagation(); ui.openImage(url); }} />;
+  return <Scene kind={scene || 'tunnels'} />;
+}
+
 export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, links, appearance, updateLink, visdevExtra, persistVisdev, hydrated }: any) {
   const [subjects, setSubjects] = React.useState(() =>
-    (VISDEV || []).map((s: any) => ({ ...s, variants: s.variants.map((v: any) => ({ ...v })), history: [...s.history] }))
+    (VISDEV || []).map((s: any) => ({ ...s, variants: s.variants.map((v: any) => ({ ...v })), history: [...s.history], sheetImgs: { poses: {}, expressions: {} } }))
   );
-  const [selId, setSelId] = React.useState<string | null>(preselect || null);
+  const [selId, setSelId] = React.useState<string | null>(preselect || (VISDEV?.[0]?.id ?? null));
   const [localToast, setLocalToast] = React.useState<string | null>(null);
   const didHydrate = React.useRef(false);
 
   React.useEffect(() => { if (preselect) setSelId(preselect); }, [preselect]);
-
-  // Hydrate the saved Visual Dev snapshot once the store has loaded.
   React.useEffect(() => {
     if (didHydrate.current) return;
-    if (hydrated) {
-      if (visdevExtra && visdevExtra.subjects) setSubjects(visdevExtra.subjects);
-      didHydrate.current = true;
-    }
+    if (hydrated) { if (visdevExtra?.subjects) setSubjects(visdevExtra.subjects); didHydrate.current = true; }
   }, [hydrated, visdevExtra]);
-
-  // Persist variants + locks + image urls for offline reload.
   React.useEffect(() => {
     if (!didHydrate.current) return;
     const id = setTimeout(() => persistVisdev?.({ subjects }), 700);
@@ -50,40 +50,58 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
 
   function flash(msg: string) {
     if (flashProp) { flashProp(msg); return; }
-    setLocalToast(msg);
-    clearTimeout(__vdT);
-    __vdT = setTimeout(() => setLocalToast(null), 2600);
+    setLocalToast(msg); clearTimeout(__vdT); __vdT = setTimeout(() => setLocalToast(null), 2600);
   }
+
+  const patchSubject = (subjId: string, fn: (s: any) => any) => setSubjects((prev: any[]) => prev.map((s: any) => s.id === subjId ? fn(s) : s));
+  const isCharacter = (s: any) => s?.kind?.toLowerCase().includes('character');
 
   function lockVariant(subjId: string, v: string) {
     const subj = subjects.find((s: any) => s.id === subjId);
-    const name = subj?.subject || subjId;
     const lockedImg = subj?.variants.find((vr: any) => vr.v === v)?.imageUrl;
-    setSubjects((prev: any[]) => prev.map((s: any) => {
-      if (s.id !== subjId) return s;
-      const entry = { v, when: 'Locked just now', who: 'You' };
-      const variants = s.variants.map((vr: any) =>
-        vr.v === v ? { ...vr, state: 'Locked' } : vr.state === 'Locked' ? { ...vr, state: 'Explored' } : vr);
-      return { ...s, locked: v, variants, history: [entry, ...s.history] };
+    patchSubject(subjId, s => ({
+      ...s, locked: v,
+      variants: s.variants.map((vr: any) => vr.v === v ? { ...vr, state: 'Locked' } : vr.state === 'Locked' ? { ...vr, state: 'Explored' } : vr),
+      history: [{ v, when: 'Locked just now', who: 'You' }, ...s.history],
     }));
-    // Record the canonical image so model sheets / publish can use it as a ref.
     updateLink?.('visdevCanonical', subjId, { v, assetId: assetIdOf(lockedImg) });
-    flash(`${name} locked to ${v}`);
+    if (isCharacter(subj) && lockedImg) updateLink?.('characterPortrait', subjId, assetIdOf(lockedImg)); // feeds Narrative hero
+    flash(`${subj?.subject || subjId} locked to ${v}`);
   }
-
-  function setVariantState(subjId: string, v: string, state: string) {
-    setSubjects((prev: any[]) => prev.map((s: any) =>
-      s.id !== subjId ? s : { ...s, variants: s.variants.map((vr: any) => vr.v === v ? { ...vr, state } : vr) }));
+  const setVariantState = (subjId: string, v: string, state: string) =>
+    patchSubject(subjId, s => ({ ...s, variants: s.variants.map((vr: any) => vr.v === v ? { ...vr, state } : vr) }));
+  function deleteVariant(subjId: string, v: string) {
+    patchSubject(subjId, s => ({ ...s, variants: s.variants.filter((vr: any) => vr.v !== v), locked: s.locked === v ? null : s.locked }));
+    flash('Variant deleted');
   }
-
-  // Add a freshly generated variant (with its persisted image url).
   function addVariant(subjId: string, imageUrl: string) {
-    setSubjects((prev: any[]) => prev.map((s: any) => {
-      if (s.id !== subjId) return s;
+    patchSubject(subjId, s => {
       const newV = 'v' + (s.variants.length + 1);
       updateLink?.('visdevVariant', `${subjId}:${newV}`, assetIdOf(imageUrl));
       return { ...s, variants: [...s.variants, { v: newV, scene: s.scene, hue: s.hue, state: 'Candidate', note: 'Generated candidate.', imageUrl }] };
-    }));
+    });
+  }
+
+  // Generate a model-sheet row (poses or expressions) from the locked canonical, incrementally.
+  async function genSheet(subjId: string, kind: 'poses' | 'expressions', labels: string[]) {
+    const subj = subjects.find((s: any) => s.id === subjId);
+    const canonical = subj?.variants.find((v: any) => v.v === subj.locked)?.imageUrl;
+    if (!canonical) { flash('Lock a generated variant first — the sheet edits the canonical image.'); return; }
+    try {
+      const ref = await loadAssetDataUrl(canonical);
+      for (const label of labels) {
+        flash(`Generating ${kind === 'poses' ? 'pose' : 'expression'} "${label}"…`);
+        const instruction = kind === 'poses'
+          ? `${subj.subject}, ${label} view, full body, same character, plain background`
+          : `${subj.subject}, ${label} facial expression, same character`;
+        const imgs = await generate(expressionEdit({ refImageName: 'ref.png', instruction }), { images: [{ name: 'ref.png', image: ref }] });
+        if (imgs[0]) {
+          const saved = await saveAsset(imageSrc(imgs[0]), { workflow: 'sheet', subject: subjId, kind, label });
+          patchSubject(subjId, s => ({ ...s, sheetImgs: { ...s.sheetImgs, [kind]: { ...s.sheetImgs?.[kind], [label]: saved.url } } }));
+        }
+      }
+      flash(`${kind === 'poses' ? 'Poses' : 'Expressions'} generated for ${subj.subject}`);
+    } catch (e: any) { flash('Sheet generation failed: ' + e.message); }
   }
 
   const sel = subjects.find((s: any) => s.id === selId) || null;
@@ -94,65 +112,53 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
         {VIS_TABS.map(t => (
           <button key={t.id} className={cx('ww-subtab', tab === t.id && 'is-on')} onClick={() => setTab(t.id)}>
             <span style={{ fontSize: 14 }}>{t.glyph}</span>{t.label}
-            {t.id !== 'locations' && <span className="ww-subtab-c">{t.id === 'board' ? subjects.length : subjects.filter((s: any) => s.locked && s.sheet).length}</span>}
+            {t.id === 'board' && <span className="ww-subtab-c">{subjects.length}</span>}
+            {t.id === 'sheets' && <span className="ww-subtab-c">{subjects.filter((s: any) => s.locked).length}</span>}
           </button>
         ))}
       </div>
       <div className="ww-vis-body">
-        {tab === 'board' && (
-          <ProtoBoard subjects={subjects} selId={selId} setSelId={setSelId} sel={sel}
-            onLock={lockVariant} onSetState={setVariantState} onVariant={addVariant}
-            online={online} links={links} appearance={appearance} flash={flash} />
-        )}
-        {tab === 'sheets' && <ModelSheets subjects={subjects} online={online} flash={flash} />}
-        {tab === 'locations' && <Locations online={online} flash={flash} links={links} updateLink={updateLink} />}
+        {tab === 'locations'
+          ? <Locations online={online} flash={flash} links={links} updateLink={updateLink} />
+          : (
+            <div className="ww-proto">
+              <SubjectSidebar subjects={subjects} selId={selId} setSelId={setSelId} />
+              <div className="ww-proto-main">
+                {!sel ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                    <div className="ww-sheet-empty"><b>Select a subject</b><p>Pick a character, location or prop from the sidebar.</p></div>
+                  </div>
+                ) : tab === 'board'
+                  ? <VariantInspector subj={sel} online={online} charLora={links?.characterLora?.[sel.id]?.loraName}
+                      appearance={appearance} flash={flash} onLock={lockVariant} onSetState={setVariantState}
+                      onDelete={deleteVariant} onVariant={addVariant} isCharacter={isCharacter(sel)} />
+                  : <ModelSheet subj={sel} online={online} onGenSheet={genSheet} />}
+              </div>
+            </div>
+          )}
       </div>
       {localToast && <div className="ww-toast">{localToast}</div>}
     </div>
   );
 }
 
-function ProtoBoard({ subjects, selId, setSelId, sel, onLock, onSetState, onVariant, online, links, appearance, flash }: any) {
+function SubjectSidebar({ subjects, selId, setSelId }: any) {
   return (
-    <div className="ww-proto">
-      <div className="ww-proto-subjects">
-        <div className="ww-insp-sub" style={{ padding: '0 6px 10px' }}>Subjects · {subjects.length}</div>
-        {subjects.map((s: any) => (
-          <button key={s.id} className={cx('ww-proto-subj', s.id === selId && 'is-sel')} onClick={() => setSelId(s.id === selId ? null : s.id)}>
-            <div className="ww-proto-subj-th">{thumb(s.variants.find((v: any) => v.v === s.locked)?.imageUrl, s.scene)}</div>
-            <div className="ww-proto-subj-meta"><b>{s.subject}</b><span>{s.kind}</span></div>
-            <div className={cx('ww-proto-lockdot', s.locked ? 'locked' : 'open')} />
-          </button>
-        ))}
-      </div>
-      <div className="ww-proto-main">
-        {sel ? (
-          <VariantInspector subj={sel} onLock={onLock} onSetState={onSetState} onVariant={onVariant}
-            online={online} charLora={links?.characterLora?.[sel.id]?.loraName} appearance={appearance} flash={flash} />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-            <div className="ww-sheet-empty">
-              <div className="ww-pv-kicker" style={{ marginBottom: 10 }}>Visual Dev · Echo's Location</div>
-              <b>Select a subject</b>
-              <p>Pick a character, location or prop from the sidebar to inspect its prototype variants and lock a canonical reference.</p>
-            </div>
-          </div>
-        )}
-      </div>
+    <div className="ww-proto-subjects">
+      <div className="ww-insp-sub" style={{ padding: '0 6px 10px' }}>Subjects · {subjects.length}</div>
+      {subjects.map((s: any) => (
+        <button key={s.id} className={cx('ww-proto-subj', s.id === selId && 'is-sel')} onClick={() => setSelId(s.id)}>
+          <div className="ww-proto-subj-th"><Thumb url={s.variants.find((v: any) => v.v === s.locked)?.imageUrl} scene={s.scene} /></div>
+          <div className="ww-proto-subj-meta"><b>{s.subject}</b><span>{s.kind}</span></div>
+          <div className={cx('ww-proto-lockdot', s.locked ? 'locked' : 'open')} />
+        </button>
+      ))}
     </div>
   );
 }
 
-function thumb(imageUrl: string | undefined, scene: string) {
-  return imageUrl ? <img src={assetUrl(imageUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <Scene kind={scene} />;
-}
-
-function VariantInspector({ subj, onLock, onSetState, onVariant, online, charLora, appearance, flash }: any) {
-  const bibleAppearance = (BIBLE || {})[subj.id]?.appearance || '';
-  const appear = (appearance && appearance[subj.id]) || bibleAppearance;
-  const candidates = subj.variants.filter((v: any) => v.state === 'Candidate');
-  const isCharacter = subj.kind?.toLowerCase().includes('character');
-
+function VariantInspector({ subj, online, charLora, appearance, flash, onLock, onSetState, onDelete, onVariant, isCharacter }: any) {
+  const appear = (appearance && appearance[subj.id]) || (BIBLE || {})[subj.id]?.appearance || '';
   return (
     <div>
       <div className="ww-proto-brief">
@@ -162,19 +168,14 @@ function VariantInspector({ subj, onLock, onSetState, onVariant, online, charLor
           <p>{subj.brief}</p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-          {subj.locked
-            ? <div className="ww-vd-lockbadge"><span className="ww-vd-lockdot" />{subj.locked} locked</div>
-            : <span className="ww-sheet-unlocktag">No lock · {candidates.length} candidate{candidates.length !== 1 ? 's' : ''}</span>}
+          {subj.locked ? <div className="ww-vd-lockbadge"><span className="ww-vd-lockdot" />{subj.locked} locked</div> : <span className="ww-sheet-unlocktag">No lock</span>}
           {charLora && <span className="ww-sheet-unlocktag">LoRA · {charLora.replace('.safetensors', '')}</span>}
         </div>
       </div>
 
       {appear && (
-        <div className="ww-bp-appear" style={{ marginBottom: 22, marginTop: 0 }}>
-          <div className="ww-bp-appear-head">
-            <div className="ww-insp-sub" style={{ margin: 0 }}>Narrative brief</div>
-            <span className="ww-bp-feeds">◎ from Characters</span>
-          </div>
+        <div className="ww-bp-appear" style={{ marginBottom: 18, marginTop: 0 }}>
+          <div className="ww-bp-appear-head"><div className="ww-insp-sub" style={{ margin: 0 }}>Narrative brief</div><span className="ww-bp-feeds">◎ from Characters</span></div>
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55, color: 'var(--ink)' }}>{appear}</p>
         </div>
       )}
@@ -183,228 +184,127 @@ function VariantInspector({ subj, onLock, onSetState, onVariant, online, charLor
         workflows={['txt2img-flux', 'txt2img-sdxl']}
         initialPrompt={appear ? `${appear} — ${subj.brief}` : subj.brief}
         lora={isCharacter ? charLora : undefined}
+        plainBgDefault={isCharacter} negativeDefault={NEG_DEFAULT}
         online={online} flash={flash} buttonLabel="✦ Generate variant"
         onResult={(assets: GenResult[]) => assets.forEach(a => onVariant(subj.id, a.url))}
       />
 
       <div className="ww-insp-sub" style={{ marginBottom: 12, marginTop: 18 }}>Variants · {subj.variants.length}</div>
       <div className="ww-vargrid">
-        {subj.variants.map((v: any) => (
-          <VariantCard key={v.v} variant={v} isLocked={subj.locked === v.v} subjId={subj.id} onLock={() => onLock(subj.id, v.v)} onSetState={onSetState} />
-        ))}
-      </div>
-
-      {subj.history.length > 0 && (
-        <div style={{ marginTop: 34 }}>
-          <div className="ww-insp-sub" style={{ marginBottom: 10 }}>History · {subj.history.length}</div>
-          <div className="ww-sheet-history">
-            {subj.history.map((h: any, i: number) => (
-              <div key={i} className={cx('ww-histrow', h.when.toLowerCase().includes('lock') && 'is-locked')}>
-                <b>{h.v}</b><span className="ww-hist-when">{h.when}</span><span className="ww-hist-who">{h.who}</span>
+        {subj.variants.map((v: any) => {
+          const meta = STATE_META[v.state] || STATE_META.Explored;
+          const locked = subj.locked === v.v;
+          return (
+            <div key={v.v} className={cx('ww-varcard', locked && 'is-locked')}>
+              <div className="ww-varcard-art">
+                <Thumb url={v.imageUrl} scene={v.scene} />
+                <span className="ww-varcard-v">{v.v}</span>
+                {locked && <span className="ww-varcard-lock">● locked</span>}
               </div>
-            ))}
+              <div className="ww-varcard-body">
+                <div className="ww-varcard-state" style={{ color: meta.color }}>{v.state}</div>
+                <div className="ww-varcard-note">{v.note}</div>
+                <div className="ww-varcard-actions">
+                  {locked ? <div className="ww-lockbtn is-locked">● Canonical</div> : <button className="ww-lockbtn" onClick={() => onLock(subj.id, v.v)}>Lock canonical →</button>}
+                  {!locked && v.state !== 'Rejected' && <button className="ww-varcard-dupe" title="Reject" onClick={() => onSetState(subj.id, v.v, 'Rejected')}>✕</button>}
+                  <button className="ww-varcard-dupe" title="Delete variant" style={{ color: '#ff7a6a' }} onClick={() => onDelete(subj.id, v.v)}>🗑</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ModelSheet({ subj, online, onGenSheet }: any) {
+  const canonical = subj.variants.find((v: any) => v.v === subj.locked)?.imageUrl;
+  const poses: string[] = subj.sheet?.poses || ['Front', '3/4', 'Profile'];
+  const exprs: string[] = subj.sheet?.expressions || [];
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const disabled = !canonical || online === false || !!busy;
+
+  async function run(kind: 'poses' | 'expressions', labels: string[]) {
+    setBusy(kind); try { await onGenSheet(subj.id, kind, labels); } finally { setBusy(null); }
+  }
+
+  return (
+    <div>
+      <div className="ww-sheet-top" style={{ marginBottom: 16 }}>
+        <div>
+          <div className="ww-pv-kicker">Model sheet · {subj.kind}</div>
+          <h2>{subj.subject}{subj.locked ? <span className="ww-sheet-locktag" style={{ marginLeft: 10 }}>{subj.locked}</span> : <span className="ww-sheet-unlocktag" style={{ marginLeft: 10 }}>not locked</span>}</h2>
+          <p>{subj.brief}</p>
+        </div>
+      </div>
+      {!canonical && <div className="ww-sheet-empty" style={{ marginBottom: 18 }}><b>No canonical image yet</b><p>Generate a variant on the Prototype board and lock it — the sheet is built by editing that canonical image.</p></div>}
+
+      <div className="ww-sheet-hero"><Thumb url={canonical} scene={subj.scene} /></div>
+
+      <div className="ww-sheet-cols">
+        <div className="ww-sheet-block">
+          <div className="ww-sheet-blockhead">
+            <div className="ww-insp-sub">Poses · {poses.length}</div>
+            <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('poses', poses)}>{busy === 'poses' ? 'Generating…' : '✦ Generate poses'}</button>
+          </div>
+          <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(poses.length, 4)},1fr)` }}>
+            {poses.map((pose, i) => <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art"><Thumb url={subj.sheetImgs?.poses?.[pose]} scene={subj.scene} /></div><span>{pose}</span></div>)}
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-function VariantCard({ variant, isLocked, subjId, onLock, onSetState }: any) {
-  const meta = STATE_META[variant.state] || STATE_META.Explored;
-  return (
-    <div className={cx('ww-varcard', isLocked && 'is-locked')}>
-      <div className="ww-varcard-art">
-        {thumb(variant.imageUrl, variant.scene)}
-        <span className="ww-varcard-v">{variant.v}</span>
-        {isLocked && <span className="ww-varcard-lock">● locked</span>}
-        {!isLocked && variant.state === 'Candidate' && (
-          <span className="ww-varcard-lock" style={{ background: 'rgba(243,178,60,.22)', color: '#f3b23c', boxShadow: 'none' }}>candidate</span>
+        {exprs.length > 0 && (
+          <div className="ww-sheet-block">
+            <div className="ww-sheet-blockhead">
+              <div className="ww-insp-sub">Expressions · {exprs.length}</div>
+              <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('expressions', exprs)}>{busy === 'expressions' ? 'Generating…' : '✦ Generate expressions'}</button>
+            </div>
+            <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(exprs.length, 4)},1fr)` }}>
+              {exprs.map((expr, i) => <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art"><Thumb url={subj.sheetImgs?.expressions?.[expr]} scene={subj.scene} /></div><span>{expr}</span></div>)}
+            </div>
+          </div>
         )}
       </div>
-      <div className="ww-varcard-body">
-        <div className="ww-varcard-state" style={{ color: meta.color }}>{variant.state}</div>
-        <div className="ww-varcard-note">{variant.note}</div>
-        <div className="ww-varcard-actions">
-          {isLocked ? <div className="ww-lockbtn is-locked">● Canonical</div> : <button className="ww-lockbtn" onClick={onLock}>Lock canonical →</button>}
-          {!isLocked && variant.state !== 'Rejected' && (
-            <button className="ww-varcard-dupe" title="Reject variant" onClick={() => onSetState(subjId, variant.v, 'Rejected')}>✕</button>
-          )}
-          {variant.state === 'Rejected' && (
-            <button className="ww-varcard-dupe" title="Restore to candidate" onClick={() => onSetState(subjId, variant.v, 'Candidate')}>↩</button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
 
-function ModelSheets({ subjects, online, flash }: any) {
-  const locked = subjects.filter((s: any) => s.locked && s.sheet);
-  const pending = subjects.filter((s: any) => !s.locked);
+// New angles of a location from a base image. Uses Flux Kontext (instruction edit)
+// which re-interprets the view, rather than ControlNet which locks composition.
+function Locations({ online, flash, links, updateLink }: any) {
+  const ui = useUI();
+  const [ref, setRef] = React.useState<string | null>(null);
+  const [angles, setAngles] = React.useState<string[]>(() => (Object.values(links?.locationAngles || {}).flat() as string[]));
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const pickRef = (file: File) => { const r = new FileReader(); r.onloadend = () => setRef(r.result as string); r.readAsDataURL(file); };
+
   return (
     <div className="ww-sheet">
       <div className="ww-sheet-top">
         <div>
-          <div className="ww-pv-kicker">Visual Dev · Echo's Location</div>
-          <h2>Model Sheets<span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 400, color: 'var(--ink2)', marginLeft: 10 }}>{locked.length} of {subjects.length}</span></h2>
-          <p>Canonical references — poses, expressions and palette — for every locked subject.</p>
-        </div>
-      </div>
-      {locked.length === 0 ? (
-        <div className="ww-sheet-empty"><b>No locked references yet</b><p>Lock a variant in the Prototype board to generate a model sheet here.</p></div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {locked.map((s: any, i: number) => <ModelSheetCard key={s.id} subject={s} last={i === locked.length - 1} online={online} flash={flash} />)}
-        </div>
-      )}
-      {pending.length > 0 && (
-        <div style={{ marginTop: 40 }}>
-          <div className="ww-insp-sub" style={{ marginBottom: 14 }}>Awaiting lock · {pending.length}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pending.map((s: any) => (
-              <div key={s.id} className="ww-vd-pending-row">
-                <div className="ww-vd-pending-th">{thumb(s.variants.find((v: any) => v.v === s.locked)?.imageUrl, s.scene)}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{s.subject}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{s.kind} · {s.variants.length} exploration{s.variants.length !== 1 ? 's' : ''}</div>
-                </div>
-                <span className="ww-sheet-unlocktag">No lock</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ModelSheetCard({ subject, last, online, flash }: any) {
-  const lockedVar = subject.variants.find((v: any) => v.v === subject.locked);
-  const canonicalUrl = lockedVar?.imageUrl;
-  const hasExprs = subject.sheet.expressions && subject.sheet.expressions.length > 0;
-  const poseCols = Math.min(subject.sheet.poses.length, 4);
-  const exprCols = Math.min((subject.sheet.expressions || []).length, 4);
-  const [exprImgs, setExprImgs] = React.useState<Record<string, string>>({});
-  const [busy, setBusy] = React.useState(false);
-
-  async function generateSheet() {
-    if (!canonicalUrl) { flash('Lock a generated variant first — the expression sheet edits the canonical image.'); return; }
-    setBusy(true);
-    try {
-      const ref = await loadAssetDataUrl(canonicalUrl);
-      for (const expr of subject.sheet.expressions) {
-        flash(`Generating "${expr}"…`);
-        const imgs = await generate(expressionEdit({ refImageName: 'ref.png', instruction: `${subject.subject}, ${expr} expression` }), { images: [{ name: 'ref.png', image: ref }] });
-        if (imgs[0]) { const saved = await saveAsset(imageSrc(imgs[0]), { workflow: 'expression-edit', subject: subject.id, expr }); setExprImgs(m => ({ ...m, [expr]: saved.url })); }
-      }
-      flash(`Expression sheet generated for ${subject.subject}`);
-    } catch (e: any) { flash('Sheet failed: ' + e.message); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <div style={{ paddingBottom: last ? 0 : 60, marginBottom: last ? 0 : 60, borderBottom: last ? 'none' : '1px solid var(--line)' }}>
-      <div className="ww-sheet-top" style={{ marginBottom: 16 }}>
-        <div>
-          <h2>{subject.subject}<span className="ww-sheet-locktag" style={{ marginLeft: 10 }}>{subject.locked}</span></h2>
-          <p>{subject.brief}</p>
-        </div>
-        {hasExprs && (
-          <button className={cx('ww-gen-btn', (busy || online === false || !canonicalUrl) && 'is-offline')} style={{ flexShrink: 0, fontSize: 12 }} disabled={busy || online === false || !canonicalUrl} onClick={generateSheet}>
-            {busy ? 'Generating…' : '✦ Generate expressions'}
-          </button>
-        )}
-      </div>
-      <div className="ww-sheet-hero">
-        {thumb(canonicalUrl, lockedVar?.scene || subject.scene)}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg,rgba(6,7,12,.75),transparent 52%)', zIndex: 2 }} />
-        <div className="ww-sheet-hero-tag">{subject.kind} · Canonical · {subject.locked}{subject.history[0] && <span style={{ marginLeft: 10, opacity: .65 }}>· {subject.history[0].when}</span>}</div>
-      </div>
-      <div className="ww-sheet-cols">
-        <div className="ww-sheet-block">
-          <div className="ww-insp-sub">Poses · {subject.sheet.poses.length}</div>
-          <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${poseCols},1fr)` }}>
-            {subject.sheet.poses.map((pose: string, i: number) => (
-              <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art">{thumb(canonicalUrl, subject.scene)}</div><span>{pose}</span></div>
-            ))}
-          </div>
-        </div>
-        <div className="ww-sheet-block">
-          {hasExprs ? (
-            <>
-              <div className="ww-insp-sub">Expressions · {subject.sheet.expressions.length}</div>
-              <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${exprCols},1fr)` }}>
-                {subject.sheet.expressions.map((expr: string, i: number) => (
-                  <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art">{thumb(exprImgs[expr], subject.scene)}</div><span>{expr}</span></div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="ww-insp-sub">Notes</div>
-              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink2)', lineHeight: 1.6 }}>
-                {subject.kind === 'Location' ? 'Location reference — no expression sheet. Poses cover the key camera angles.' : 'Prop reference — poses cover close-up, in-context, and detail shots.'}
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-      <div style={{ marginTop: 22 }}>
-        <div className="ww-insp-sub" style={{ marginBottom: 12 }}>Palette · {subject.sheet.palette.length} swatches</div>
-        <div className="ww-sheet-pal">
-          {subject.sheet.palette.map((col: string, i: number) => (
-            <div key={i} className="ww-sheet-pal-sw"><i style={{ background: col }} /><span style={{ textTransform: 'uppercase' }}>{col}</span></div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// New angles of a location from a base image via the ControlNet perspective workflow.
-function Locations({ online, flash, links, updateLink }: any) {
-  const [ref, setRef] = React.useState<string | null>(null);
-  const [angles, setAngles] = React.useState<string[]>(() => Object.values(links?.locationAngles || {}).flat() as string[]);
-  const fileRef = React.useRef<HTMLInputElement>(null);
-
-  function pickRef(file: File) {
-    const r = new FileReader();
-    r.onloadend = () => setRef(r.result as string);
-    r.readAsDataURL(file);
-  }
-
-  return (
-    <div className="ww-sheet" style={{ padding: 0 }}>
-      <div className="ww-sheet-top">
-        <div>
           <div className="ww-pv-kicker">Visual Dev · Locations</div>
           <h2>New perspectives</h2>
-          <p>Load a location image, then regenerate it from a consistent new camera angle (ControlNet lines / depth).</p>
+          <p>Load a location image, then describe a new camera angle (e.g. “from a high balcony looking down”). Uses instruction-editing to re-frame the same place.</p>
         </div>
         <button className="ww-filter" onClick={() => fileRef.current?.click()}>⤓ Load location image</button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) pickRef(f); e.currentTarget.value = ''; }} />
       </div>
-      {ref && (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', margin: '8px 0 16px' }}>
-          <div className="ww-thumb-art" style={{ width: 200, borderRadius: 10, overflow: 'hidden' }}><img src={ref} alt="reference" style={{ width: '100%', display: 'block' }} /></div>
+      {ref ? (
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
+          <div style={{ width: 200, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}><img className="ww-zoomable" src={ref} alt="reference" style={{ width: '100%', display: 'block' }} onClick={() => ui.openImage(ref)} /></div>
           <div style={{ flex: 1 }}>
             <GenerationPanel
-              workflows={['perspective-consistent']} refImage={ref} online={online} flash={flash}
-              promptLabel="Describe the new angle, e.g. 'same street from a high balcony'"
-              buttonLabel="✦ Generate angle"
+              workflows={['expression-edit']} refImage={ref} online={online} flash={flash}
+              promptLabel="Describe the new angle, e.g. 'same street from a high balcony looking down'"
+              buttonLabel="✦ Generate new angle"
               onResult={(assets: GenResult[]) => { const urls = assets.map(a => a.url); setAngles(a => [...urls, ...a]); updateLink?.('locationAngles', 'session', [...urls, ...angles]); }}
             />
           </div>
         </div>
-      )}
-      {!ref && <div className="ww-sheet-empty" style={{ marginTop: 12 }}><b>Load a location image to begin</b><p>The new angle stays consistent with the source via its extracted lines.</p></div>}
+      ) : <div className="ww-sheet-empty" style={{ marginBottom: 18 }}><b>Load a location image to begin</b><p>Then describe the new camera angle.</p></div>}
       {angles.length > 0 && (
         <>
           <div className="ww-insp-sub" style={{ marginBottom: 10 }}>Generated angles · {angles.length}</div>
-          <div className="ww-gen-gallery">
-            {angles.map((u, i) => <div key={i} className="ww-thumb-art" style={{ borderRadius: 10, overflow: 'hidden' }}><img src={assetUrl(u)} alt="" style={{ width: '100%', display: 'block' }} /></div>)}
-          </div>
+          <div className="ww-gen-gallery">{angles.map((u, i) => <div key={i} style={{ borderRadius: 10, overflow: 'hidden' }}><Thumb url={u} /></div>)}</div>
         </>
       )}
     </div>

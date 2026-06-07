@@ -14,6 +14,7 @@ import { VisualDev } from './visdev';
 import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
 import { getState, patchState, setLink as apiSetLink, type StoreLinks } from './services/store';
+import { UIContext, useUIProvider, Lightbox } from './ui-context';
 
 const TWEAK_DEFAULTS = {
   canvasModel: 'filmstrip',
@@ -101,6 +102,9 @@ export default function App() {
     });
   }
 
+  const ui = useUIProvider();
+  const [navOpen, setNavOpen] = React.useState(true);
+
   const activeObj = series.find(s => s.id === activeSeries) || series[0];
   const isEcho = activeSeries === 'echo';
   const setSub = (wsId: string, v: string) => setSubs(s => ({ ...s, [wsId]: v }));
@@ -133,9 +137,12 @@ export default function App() {
   const showCop = copilot && ws !== 'series';
 
   return (
-    <div className={cx('ww-app', 'dens-' + (t.density || 'regular'))} style={{ ...rootStyle, '--dens': dens } as any}>
+    <UIContext.Provider value={ui.api}>
+    <div className={cx('ww-app', 'dens-' + (t.density || 'regular'), !navOpen && 'nav-collapsed')} style={{ ...rootStyle, '--dens': dens } as any}>
+      {!navOpen && <button className="ww-nav-reopen" title="Show menu" onClick={() => setNavOpen(true)}>☰</button>}
       {/* NAVIGATOR */}
       <nav className="ww-nav2">
+        <button className="ww-nav-collapse" title="Hide menu" onClick={() => setNavOpen(false)}>«</button>
         <div className="ww-nav2-brand">
           <img className="ww-nav-logo-sm" src="/src/assets/brand/wordwerx-logo-dark.svg" alt="WORDWERX" onClick={() => setWs('series')} style={{ cursor: 'pointer' }} />
           <button className={cx('ww-nav-icon-btn', copilot && 'is-on')} title="Sherlock — your story co-pilot" onClick={() => setCopilot(c => !c)}>
@@ -147,11 +154,14 @@ export default function App() {
               <path d="M8 5.5 Q10 3 12 5.5" />
             </svg>
           </button>
-          <button className="ww-nav-icon-btn" title="Notifications">
+          <button className="ww-nav-icon-btn" title="Notifications — click to clear" onClick={ui.clearNotif}>
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 2 C7 3 6 5.5 6 8 L6 13 L4 14 L16 14 L14 13 L14 8 C14 5.5 13 3 10 2 Z" />
               <path d="M8.5 14 Q8.5 16.5 10 16.5 Q11.5 16.5 11.5 14" />
             </svg>
+            {(ui.notif.count > 0 || ui.notif.error) && (
+              <span className={cx('ww-nav-badge', ui.notif.error && 'is-error')}>{ui.notif.error ? '!' : ui.notif.count}</span>
+            )}
           </button>
         </div>
 
@@ -234,6 +244,8 @@ export default function App() {
         <TweakRadio label="Density" value={t.density} options={['compact', 'regular', 'comfy']} onChange={(v: string) => setTweak('density', v)} />
       </TweaksPanel>
     </div>
+    <Lightbox url={ui.image} onClose={ui.closeImage} />
+    </UIContext.Provider>
   );
 }
 

@@ -4,9 +4,8 @@ import { StateDot, FxChip } from './ui';
 import { CHARACTERS, mkFx } from './data';
 import { ARCS, SEASONS, BIBLE } from './world';
 import { Scene } from './scenes';
-import { txt2imgFlux } from './workflows';
-import { generate, imageSrc, listLoras, type Lora } from './services/runpod';
-import { saveAsset, assetUrl, assetIdOf } from './services/store';
+import { assetUrl } from './services/store';
+import { useUI } from './ui-context';
 
 const NARR_TABS = [
   { id: 'cast', label: 'Characters', glyph: '☺' },
@@ -43,38 +42,16 @@ export function Narrative({ panels, setPanels, episode, tab, setTab, onGoVisual,
   );
 }
 
-function Bible({ onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
+function Bible({ onGoVisual, links, appearance, updateAppearance }: any) {
+  const ui = useUI();
   const chars = CHARACTERS;
   const [selId, setSelId] = React.useState(chars[0].id);
-  const [loras, setLoras] = React.useState<Lora[]>([]);
-  const [busy, setBusy] = React.useState(false);
   const c = chars.find(x => x.id === selId) as any;
   const b = BIBLE[selId] || {};
   const appText = (appearance && appearance[selId] != null) ? appearance[selId] : (b.appearance || '');
-  const charLora = links?.characterLora?.[selId]?.loraName || '';
+  // Portrait comes from Visual Dev (the locked canonical), shown read-only here.
   const portraitUrl = (id?: string) => assetUrl(links?.characterPortrait?.[id || selId]);
   const relOf = (id: string) => chars.find(x => x.id === id) as any;
-
-  React.useEffect(() => { listLoras().then(setLoras).catch(() => {}); }, []);
-
-  async function generatePortrait() {
-    if (!appText.trim()) { flash?.('Add an appearance description first.'); return; }
-    setBusy(true);
-    try {
-      const lora = charLora ? { name: charLora, strength: 0.9 } : undefined;
-      const imgs = await generate(txt2imgFlux({ positive: `${c.name} — ${appText}`, lora }), {});
-      if (imgs[0]) {
-        const saved = await saveAsset(imageSrc(imgs[0]), { workflow: 'portrait', character: selId });
-        updateLink?.('characterPortrait', selId, assetIdOf(saved.url));
-        flash?.(`Portrait generated for ${c.name}`);
-      }
-    } catch (e: any) { flash?.('Portrait failed: ' + e.message); }
-    finally { setBusy(false); }
-  }
-
-  function setCharLora(loraName: string) {
-    updateLink?.('characterLora', selId, loraName ? { loraName, triggerWord: loraName.replace('.safetensors', '') } : { loraName: '' });
-  }
 
   const avImg = portraitUrl();
 
@@ -87,7 +64,7 @@ function Bible({ onGoVisual, online, links, appearance, updateAppearance, update
           return (
             <button key={x.id} className={cx('ww-rostercard', x.id === selId && 'is-sel')} onClick={() => setSelId(x.id)}>
               <div className="ww-roster-av" style={pu ? { overflow: 'hidden' } : charAvatar(x.tint)}>
-                {pu ? <img src={pu} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>{x.name[0]}</span>}
+                {pu ? <img className="ww-zoomable" src={pu} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={e => { e.stopPropagation(); ui.openImage(pu); }} /> : <span>{x.name[0]}</span>}
               </div>
               <div className="ww-roster-meta"><b>{x.name}</b><span>{x.role}</span></div>
               <StateDot state={x.state} />
@@ -98,7 +75,7 @@ function Bible({ onGoVisual, online, links, appearance, updateAppearance, update
       <div className="ww-bible-profile">
         <div className="ww-bp-hero">
           <div className="ww-bp-av" style={avImg ? { overflow: 'hidden' } : charAvatar(c.tint)}>
-            {avImg ? <img src={avImg} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span>{c.name[0]}</span>}
+            {avImg ? <img className="ww-zoomable" src={avImg} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => ui.openImage(avImg)} /> : <span>{c.name[0]}</span>}
           </div>
           <div className="ww-bp-h">
             <h1>{c.name}</h1>
@@ -114,16 +91,7 @@ function Bible({ onGoVisual, online, links, appearance, updateAppearance, update
           <textarea className="ww-bp-appear-field" rows={3} value={appText}
             placeholder="Describe them physically — age, build, distinguishing features, wardrobe, palette cues…"
             onChange={e => updateAppearance?.(selId, e.target.value)} />
-          <div className="ww-gen-row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            <select className="ww-filter" value={charLora} onChange={e => setCharLora(e.target.value)} title="Character LoRA">
-              <option value="">No LoRA</option>
-              {loras.map(l => <option key={l.name} value={l.name}>{l.name.replace('.safetensors', '')}</option>)}
-            </select>
-            <button className={cx('ww-gen-btn', (busy || online === false) && 'is-offline')} disabled={busy || online === false} onClick={generatePortrait}>
-              {busy ? 'Generating…' : '✦ Generate portrait'}
-            </button>
-            <button className="ww-bp-appear-link" style={{ marginLeft: 'auto' }} onClick={() => onGoVisual && onGoVisual(selId)}>{`Develop ${c.name.split(' ')[0]}'s look →`}</button>
-          </div>
+          <button className="ww-bp-appear-link" onClick={() => onGoVisual && onGoVisual(selId)}>{`Develop ${c.name.split(' ')[0]}'s look in Visual Dev →`}</button>
         </div>
         <div className="ww-bp-grid">
           <div className="ww-bp-cell"><div className="ww-insp-sub">Wants</div><p>{b.wants}</p></div>

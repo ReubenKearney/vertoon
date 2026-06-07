@@ -1,6 +1,7 @@
 import React from 'react';
 import { EFFECT_TYPES } from './data';
 import { Scene } from './scenes';
+import { useUI } from './ui-context';
 
 export function cx(...a: (string | boolean | null | undefined)[]) {
   return a.filter(Boolean).join(' ');
@@ -29,11 +30,12 @@ export function StateDot({ state }: { state: string }) {
 }
 
 export function AssetThumb({ scene, label, sub, source, state, onClick, selected, tall, imageUrl }: any) {
+  const ui = useUI();
   return (
     <button className={cx('ww-thumb', selected && 'is-sel', tall && 'is-tall')} onClick={onClick}>
       <div className="ww-thumb-art">
         {imageUrl
-          ? <img src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ? <img className="ww-zoomable" src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onClick={e => { e.stopPropagation(); ui.openImage(imageUrl); }} />
           : <Scene kind={scene} />}
       </div>
       <div className="ww-thumb-meta">
