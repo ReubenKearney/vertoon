@@ -75,11 +75,10 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
     flash('Variant deleted');
   }
   function addVariant(subjId: string, imageUrl: string) {
-    patchSubject(subjId, s => {
-      const newV = 'v' + (s.variants.length + 1);
-      updateLink?.('visdevVariant', `${subjId}:${newV}`, assetIdOf(imageUrl));
-      return { ...s, variants: [...s.variants, { v: newV, scene: s.scene, hue: s.hue, state: 'Candidate', note: 'Generated candidate.', imageUrl }] };
-    });
+    const subj = subjects.find((s: any) => s.id === subjId);
+    const newV = 'v' + ((subj?.variants.length || 0) + 1);
+    updateLink?.('visdevVariant', `${subjId}:${newV}`, assetIdOf(imageUrl)); // outside the updater (no setState-in-render)
+    patchSubject(subjId, s => ({ ...s, variants: [...s.variants, { v: newV, scene: s.scene, hue: s.hue, state: 'Candidate', note: 'Generated candidate.', imageUrl }] }));
   }
 
   // Generate a model-sheet row (poses or expressions) from the locked canonical, incrementally.

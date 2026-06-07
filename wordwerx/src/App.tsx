@@ -222,7 +222,7 @@ export default function App() {
             {ws === 'production' && isEcho && (
               (subs as any).production === 'story' ? <Story panels={panels} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} /> :
-              (subs as any).production === 'compose' ? <Compose panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} /> :
+              (subs as any).production === 'compose' ? <Compose panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
               (subs as any).production === 'preview' ? <Preview panels={panels} /> :
               <Publish panels={panels} library={library} links={links} updateLink={updateLink} flash={flash} />
             )}

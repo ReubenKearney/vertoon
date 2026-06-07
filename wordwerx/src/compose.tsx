@@ -4,6 +4,14 @@ import { FxChip } from './ui';
 import { mkFx } from './data';
 import { Scene } from './scenes';
 import { FxInspector, FxTracks, FxStage } from './effects';
+import { assetUrl, assetIdOf } from './services/store';
+import { useUI } from './ui-context';
+
+function PanelArt({ url, scene }: { url?: string; scene: string }) {
+  const ui = useUI();
+  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onClick={e => { e.stopPropagation(); ui.openImage(url); }} />;
+  return <Scene kind={scene} />;
+}
 
 function useFxOps(panel: any, updatePanel: (p: any) => void) {
   return {
@@ -14,7 +22,7 @@ function useFxOps(panel: any, updatePanel: (p: any) => void) {
   };
 }
 
-function PanelCard({ panel, selected, onSelect, big }: any) {
+function PanelCard({ panel, selected, onSelect, big, artUrl }: any) {
   return (
     <div className={cx('ww-pcard', selected && 'is-sel', big && 'is-big')} onClick={onSelect}>
       <div className="ww-pcard-gutter">
@@ -23,7 +31,7 @@ function PanelCard({ panel, selected, onSelect, big }: any) {
         <span className="ww-pcard-dur">{panel.dur}</span>
       </div>
       <div className="ww-pcard-frame">
-        <Scene kind={panel.scene} />
+        <PanelArt url={artUrl} scene={panel.scene} />
         <div className="ww-pcard-slug">{panel.slug}</div>
         {panel.dialogue
           ? <div className="ww-pcard-dlg"><b>{panel.speaker}</b>{panel.dialogue}</div>
@@ -36,9 +44,11 @@ function PanelCard({ panel, selected, onSelect, big }: any) {
   );
 }
 
-export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI }: any) {
+export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI, library, links, updateLink }: any) {
   const [selFx, setSelFx] = React.useState<string | null>(null);
   const panel = panels.find((p: any) => p.id === selId) || panels[0];
+  const artOf = (p: any) => links?.panelImage?.[p?.id];
+  const artAssets = (library || []).filter((a: any) => a.imageUrl);
   const updatePanel = (np: any) => setPanels(panels.map((p: any) => p.id === np.id ? np : p));
   const ops = useFxOps(panel, updatePanel);
   React.useEffect(() => { setSelFx(null); }, [selId]);
@@ -64,7 +74,7 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI 
           {panels.map((p: any, i: number) => (
             <div key={p.id} className={cx('ww-seqitem', p.id === selId && 'is-sel')} onClick={() => setSelId(p.id)}>
               <span className="ww-seq-n">{String(p.n).padStart(2, '0')}</span>
-              <div className="ww-seq-mini"><Scene kind={p.scene} /></div>
+              <div className="ww-seq-mini">{artOf(p) ? <img src={assetUrl(artOf(p))} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scene kind={p.scene} />}</div>
               <div className="ww-seq-meta"><b>{p.slug}</b><span>{p.fx.length} fx · {p.beat}</span></div>
               <div className="ww-seq-move">
                 <button onClick={e => { e.stopPropagation(); move(i, -1); }}>▴</button>
@@ -80,7 +90,7 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI 
         {canvasModel === 'filmstrip' && (
           <div className="ww-filmstrip">
             <div className="ww-readline"><span>read line</span></div>
-            {panels.map((p: any) => <PanelCard key={p.id} panel={p} selected={p.id === selId} onSelect={() => setSelId(p.id)} />)}
+            {panels.map((p: any) => <PanelCard key={p.id} panel={p} selected={p.id === selId} onSelect={() => setSelId(p.id)} artUrl={artOf(p)} />)}
             <div className="ww-strip-end">End of episode · {panels.length} panels</div>
           </div>
         )}
@@ -88,7 +98,7 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI 
           <div className="ww-board">
             {panels.map((p: any) => (
               <div key={p.id} className={cx('ww-boardcard', p.id === selId && 'is-sel')} onClick={() => setSelId(p.id)}>
-                <div className="ww-boardcard-art"><Scene kind={p.scene} />
+                <div className="ww-boardcard-art"><PanelArt url={artOf(p)} scene={p.scene} />
                   <span className="ww-boardcard-n">{String(p.n).padStart(2, '0')}</span>
                   <span className="ww-boardcard-fx">{p.fx.length} fx</span>
                 </div>
@@ -100,11 +110,11 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI 
         )}
         {canvasModel === 'cinema' && (
           <div className="ww-cinema">
-            <div className="ww-cinema-stage"><PanelCard panel={panel} selected big onSelect={() => {}} /></div>
+            <div className="ww-cinema-stage"><PanelCard panel={panel} selected big onSelect={() => {}} artUrl={artOf(panel)} /></div>
             <div className="ww-cinema-strip">
               {panels.map((p: any) => (
                 <button key={p.id} className={cx('ww-cinitem', p.id === selId && 'is-sel')} onClick={() => setSelId(p.id)}>
-                  <Scene kind={p.scene} /><span>{String(p.n).padStart(2, '0')}</span>
+                  {artOf(p) ? <img src={assetUrl(artOf(p))} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scene kind={p.scene} />}<span>{String(p.n).padStart(2, '0')}</span>
                 </button>
               ))}
             </div>
@@ -118,6 +128,14 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI 
           <div className="ww-insp-tags"><span>{panel.beat}</span><span>{panel.dur}</span></div>
         </div>
         <div className="ww-insp-scroll">
+          <div className="ww-insp-sub">Panel art</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
+            <div className="ww-vd-pending-th" style={{ width: 64, height: 48 }}>{artOf(panel) ? <img src={assetUrl(artOf(panel))} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scene kind={panel.scene} />}</div>
+            <select className="ww-filter" style={{ flex: 1 }} value={artOf(panel) ? assetUrl(artOf(panel)) : ''} onChange={e => updateLink?.('panelImage', panel.id, e.target.value ? assetIdOf(e.target.value) : undefined)} title="Assign generated art to this panel">
+              <option value="">{artAssets.length ? 'Assign generated art…' : 'No generated art yet'}</option>
+              {artAssets.map((a: any) => <option key={a.id} value={a.imageUrl}>{a.name}</option>)}
+            </select>
+          </div>
           <div className="ww-insp-sub">Layers · {panel.layers.length}</div>
           <div className="ww-layers">
             {panel.layers.map((l: any, i: number) => (

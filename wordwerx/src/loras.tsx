@@ -1,7 +1,8 @@
 import React from 'react';
 import { cx } from './ui';
 import { CHARACTERS } from './data';
-import { listLoras, uploadLora, trainLora, generate, pollJob, type Lora } from './services/runpod';
+import { listLoras, uploadLora, trainLora, generate, pollJob, imageSrc, type Lora } from './services/runpod';
+import { txt2imgSDXL, txt2imgFlux } from './workflows';
 
 // LoRA Manager — list, upload existing .safetensors, and train a new LoRA from
 // a character's image set. Trained/uploaded LoRAs land on the network volume
@@ -84,6 +85,36 @@ function TrainPanel({ onDone, onError, updateLink }: { onDone: (m: string) => vo
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+  // Quick training-set generator.
+  const [genPrompt, setGenPrompt] = React.useState('');
+  const [genCount, setGenCount] = React.useState(12);
+  const [genModel, setGenModel] = React.useState<'sdxl' | 'flux'>('sdxl');
+  const [genBusy, setGenBusy] = React.useState(false);
+  const PLAIN = ', isolated subject on a plain neutral light-grey studio background, full body, even lighting';
+
+  async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
+    const blob = await (await fetch(dataUrl)).blob();
+    return new File([blob], name, { type: blob.type || 'image/png' });
+  }
+
+  // Generate a varied set of images of one subject, on a clean background, ready to train on.
+  async function generateSet() {
+    if (!genPrompt.trim()) return onError('Describe the subject to generate a training set.');
+    setGenBusy(true);
+    try {
+      const made: File[] = [];
+      for (let i = 0; i < genCount; i++) {
+        setStatus(`Generating training image ${i + 1}/${genCount}…`);
+        const positive = genPrompt + PLAIN + (i % 2 ? ', three-quarter view' : i % 3 ? ', side view' : ', front view');
+        const wf = genModel === 'flux' ? txt2imgFlux({ positive, seed: 1000 + i }) : txt2imgSDXL({ positive, seed: 1000 + i, negative: 'lowres, bad anatomy, busy background' });
+        const imgs = await generate(wf, {});
+        if (imgs[0]) made.push(await dataUrlToFile(imageSrc(imgs[0]), `gen_${i + 1}.png`));
+      }
+      setFiles(f => [...f, ...made]);
+      setStatus(null);
+    } catch (e: any) { onError('Set generation failed: ' + e.message); }
+    finally { setGenBusy(false); setStatus(null); }
+  }
 
   async function submit() {
     if (!name) return onError('Give the LoRA a name.');
@@ -121,10 +152,29 @@ function TrainPanel({ onDone, onError, updateLink }: { onDone: (m: string) => vo
         <Field label="Steps"><input type="number" className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={steps} onChange={e => setSteps(+e.target.value)} /></Field>
         <Field label="Rank (dim)"><input type="number" className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={rank} onChange={e => setRank(+e.target.value)} /></Field>
       </div>
+      <div className="ww-adv" style={{ marginTop: 4 }}>
+        <div className="ww-adv-head" style={{ cursor: 'default' }}>✦ Generate a training set</div>
+        <div style={{ padding: '0 11px 12px', display: 'grid', gap: 8 }}>
+          <input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={genPrompt} onChange={e => setGenPrompt(e.target.value)} placeholder="Subject to generate, e.g. 'a young Mara journalist, lamp-lit, scarf'" />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 11, color: 'var(--ink3)', display: 'flex', gap: 6, alignItems: 'center' }}>Count
+              <input type="number" min={4} max={30} value={genCount} onChange={e => setGenCount(+e.target.value)} style={{ width: 56, height: 30, borderRadius: 7, background: 'var(--bg3)', color: 'var(--ink)', border: 'none', boxShadow: 'inset 0 0 0 1px var(--line)', padding: '0 6px' }} />
+            </label>
+            <select className="ww-filter" value={genModel} onChange={e => setGenModel(e.target.value as any)}><option value="sdxl">SDXL (fast)</option><option value="flux">Flux</option></select>
+            <button className={cx('ww-gen-btn', genBusy && 'is-busy')} disabled={genBusy} onClick={generateSet}>{genBusy ? 'Generating…' : `✦ Generate ${genCount} images`}</button>
+            <span style={{ fontSize: 11, color: 'var(--ink3)' }}>on a clean background, ready to train</span>
+          </div>
+        </div>
+      </div>
       <Field label={`Training images (${files.length})`}>
         <button className="ww-filter" onClick={() => fileRef.current?.click()}>+ Add images</button>
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={e => { setFiles(f => [...f, ...Array.from(e.target.files || [])]); e.currentTarget.value = ''; }} />
       </Field>
+      {files.length > 0 && (
+        <div className="ww-gen-gallery">
+          {files.slice(0, 24).map((f, i) => <img key={i} src={URL.createObjectURL(f)} alt="" style={{ width: '100%', borderRadius: 6, display: 'block' }} />)}
+        </div>
+      )}
       {status && <p style={{ opacity: 0.8 }}>{status}</p>}
       <div><button className={cx('ww-gen-btn', busy && 'is-busy')} disabled={busy} onClick={submit}>{busy ? 'Training…' : '✦ Train LoRA'}</button></div>
     </div>

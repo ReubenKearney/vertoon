@@ -5,7 +5,7 @@ import { CHARACTERS, EPISODE } from './data';
 import { Scene } from './scenes';
 import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import type { UseCase } from './workflows';
-import { assetUrl, assetIdOf } from './services/store';
+import { assetUrl } from './services/store';
 import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
 
 export function Library({ library, setLibrary, onUseAsset, online, flash }: any) {
@@ -101,16 +101,13 @@ export function Story({ panels }: any) {
   );
 }
 
-export function Publish({ panels, library, links, updateLink, flash }: any) {
+export function Publish({ panels, links, flash }: any) {
   const story = (panels || []).filter((p: any) => p.scene !== 'parallax_demo');
   const panelImage: Record<string, string> = links?.panelImage || {};
-  const artAssets = (library || []).filter((a: any) => a.imageUrl);
   const [downscale, setDownscale] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<{ bytes: number; withArt: number } | null>(null);
   const assigned = story.filter((p: any) => panelImage[p.id]).length;
-
-  function assign(panelId: string, imageUrl: string) { updateLink?.('panelImage', panelId, assetIdOf(imageUrl)); }
 
   async function exportComic() {
     setBusy(true);
@@ -143,22 +140,7 @@ export function Publish({ panels, library, links, updateLink, flash }: any) {
             <code>echos-location-ep01.html · {result.withArt}/{story.length} panels with art · {(result.bytes / 1e6).toFixed(2)} MB</code>
           </div>
         )}
-        <div className="ww-insp-sub" style={{ marginTop: 26, marginBottom: 10 }}>Assign panel art · {assigned}/{story.length}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflow: 'auto' }}>
-          {story.map((p: any) => (
-            <div key={p.id} className="ww-vd-pending-row">
-              <div className="ww-vd-pending-th">{panelImage[p.id] ? <img src={assetUrl(panelImage[p.id])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Scene kind={p.scene} />}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 12.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{String(p.n).padStart(2, '0')} · {p.slug}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--ink3)', fontFamily: 'var(--font-mono)' }}>{p.beat}</div>
-              </div>
-              <select className="ww-filter" value={panelImage[p.id] ? assetUrl(panelImage[p.id]) : ''} onChange={e => assign(p.id, e.target.value)} title="Panel art">
-                <option value="">{artAssets.length ? 'Pick art…' : 'No generated art yet'}</option>
-                {artAssets.map((a: any) => <option key={a.id} value={a.imageUrl}>{a.name}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
+        <p className="ww-pub-sub" style={{ marginTop: 22, fontSize: 12 }}>Assign generated images to panels in <b>Production → Compose</b> (panel inspector → “Panel art”). {assigned}/{story.length} panels currently have art.</p>
       </div>
       <div className="ww-pub-aside">
         <div className="ww-pub-poster">
