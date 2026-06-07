@@ -463,8 +463,12 @@ img.ww-zoomable{cursor:zoom-in;}
 .ww-nav-badge.is-error{background:#ff5a4e;}
 
 /* Collapsible left navigator */
-.ww-app .ww-nav2{transition:margin-left .18s ease;}
-.ww-app.nav-collapsed .ww-nav2{margin-left:calc(-1 * var(--nav-w, 248px));}
+.ww-app .ww-nav2{transition:width .18s ease, opacity .18s ease;overflow:hidden;}
+.ww-app.nav-collapsed .ww-nav2{width:0 !important;min-width:0;opacity:0;border-right:none;pointer-events:none;}
+
+/* RunPod credits chip */
+.ww-nav-credits{font:700 11px/1 var(--font-mono);color:var(--accent2);background:color-mix(in oklab,var(--accent2) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--accent2) 32%,transparent);padding:5px 8px;border-radius:8px;white-space:nowrap;}
+.ww-nav-credits.is-low{color:#ff7a6a;background:color-mix(in oklab,#ff7a6a 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in oklab,#ff7a6a 36%,transparent);}
 .ww-nav-collapse{position:absolute;top:14px;right:10px;width:24px;height:24px;border-radius:7px;background:transparent;color:var(--ink2);border:none;cursor:pointer;font-size:13px;}
 .ww-nav-collapse:hover{background:var(--bg3);color:var(--ink);}
 .ww-nav-reopen{position:fixed;top:14px;left:12px;z-index:60;width:34px;height:34px;border-radius:9px;background:var(--bg2);color:var(--ink);border:none;cursor:pointer;font-size:16px;box-shadow:inset 0 0 0 1px var(--line2);}
@@ -481,3 +485,16 @@ img.ww-zoomable{cursor:zoom-in;}
 /* Model sheet block header (title + generate button) */
 .ww-sheet-blockhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
 .ww-sheet-blockhead .ww-gen-btn{font-size:11px;padding:7px 13px;}
+
+/* Advanced toggle (checkbox row) */
+.ww-adv-toggle{display:flex !important;flex-direction:row !important;align-items:center;gap:9px;cursor:pointer;color:var(--ink2) !important;font:500 11.5px/1.35 var(--font-ui) !important;text-transform:none !important;letter-spacing:0 !important;}
+.ww-adv-toggle input{width:16px !important;height:16px !important;flex-shrink:0;accent-color:var(--accent);box-shadow:none !important;background:none !important;padding:0 !important;}
+.ww-adv-toggle b{color:var(--ink);}
+
+/* Generating skeleton placeholders */
+.ww-skel{position:relative;overflow:hidden;background:var(--bg3);}
+.ww-skel::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in oklab,var(--accent) 16%,transparent),transparent);animation:wwshimmer 1.25s infinite;}
+@keyframes wwshimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.ww-skel-tag{position:absolute;bottom:7px;left:9px;font:600 9px var(--font-mono);color:var(--ink2);z-index:1;}
+.ww-sheet-cell-art.is-sel{box-shadow:0 0 0 2px var(--accent2);}
+.ww-sheet-cell-art{cursor:pointer;}

@@ -66,6 +66,10 @@ export async function listLoras(): Promise<Lora[]> {
   return body.loras as Lora[];
 }
 
+export async function getBalance(): Promise<{ balance: number; spendPerHr: number }> {
+  return jsonOrThrow(await fetch('/api/balance')) as Promise<{ balance: number; spendPerHr: number }>;
+}
+
 export async function uploadLora(file: File): Promise<string> {
   const fd = new FormData();
   fd.append('file', file);

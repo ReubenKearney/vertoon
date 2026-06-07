@@ -10,6 +10,7 @@ import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/pu
 
 export function Library({ library, setLibrary, onUseAsset, online, flash }: any) {
   const [filter, setFilter] = React.useState('All');
+  const [pending, setPending] = React.useState(0);
   const kinds = ['All', 'Background', 'Character', 'Prop', 'FX plate'];
   const shown = library.filter((a: any) => filter === 'All' || a.kind === filter);
 
@@ -28,13 +29,16 @@ export function Library({ library, setLibrary, onUseAsset, online, flash }: any)
       <GenerationPanel
         workflows={['txt2img-flux', 'txt2img-sdxl', 'dataset-batch']}
         initialPrompt="Sulawesi access tunnel, wet concrete, single failing lamp, lethal night outside, dusk-to-indigo grade"
-        showLora online={online} flash={flash} onResult={onResult}
+        showLora online={online} flash={flash} onResult={onResult} onPending={setPending}
       />
       <div className="ww-lib-bar">
         <div className="ww-filters">{kinds.map(k => <button key={k} className={cx('ww-filter', filter === k && 'is-on')} onClick={() => setFilter(k)}>{k}</button>)}</div>
         <span className="ww-lib-count">{shown.length} assets</span>
       </div>
       <div className="ww-libgrid">
+        {Array.from({ length: pending }).map((_, i) => (
+          <div key={'sk' + i} className="ww-thumb"><div className="ww-thumb-art ww-skel"><span className="ww-skel-tag">generating…</span></div></div>
+        ))}
         {shown.map((a: any) => (
           <AssetThumb key={a.id} scene={a.scene} label={a.name} sub={a.kind} source={a.source} state={a.state} imageUrl={a.imageUrl} onClick={() => onUseAsset && onUseAsset(a)} />
         ))}

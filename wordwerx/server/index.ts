@@ -10,7 +10,7 @@ loadEnv({ path: join(dirname(fileURLToPath(import.meta.url)), '.env'), override:
 import express from 'express';
 import multer from 'multer';
 import { createReadStream } from 'node:fs';
-import { submitRun, getStatus, cancelJob } from './runpod.js';
+import { submitRun, getStatus, cancelJob, getBalance } from './runpod.js';
 import { listLoras, uploadLora, uploadTrainingImage, deleteLora } from './loras.js';
 import { buildTrainWorkflow } from './train-workflow.js';
 import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, isLinkKey, assetCount } from './store.js';
@@ -90,6 +90,9 @@ app.get('/api/jobs/:id', wrap(async (req, res) => {
 app.post('/api/jobs/:id/cancel', wrap(async (req, res) => {
   res.json(await cancelJob(req.params.id));
 }));
+
+// RunPod credit balance (USD).
+app.get('/api/balance', wrap(async (_req, res) => { res.json(await getBalance()); }));
 
 // --- LoRAs -------------------------------------------------------------------
 app.get('/api/loras', wrap(async (_req, res) => {

@@ -79,6 +79,25 @@ export function datasetBatch(p: BaseParams & { count?: number }): Record<string,
   return g;
 }
 
+// --- Flux img2img (re-frame / variation of a reference at a given strength) ---
+// denoise low (~0.4) = close to source; high (~0.8) = freer re-interpretation.
+export function img2imgFlux(p: { refImageName: string; positive: string; denoise?: number; steps?: number; seed?: number }): Record<string, any> {
+  const seed = p.seed ?? rnd();
+  return {
+    '1': { class_type: 'LoadImage', inputs: { image: p.refImageName } },
+    '10': { class_type: 'UNETLoader', inputs: { unet_name: 'flux1-dev.safetensors', weight_dtype: 'default' } },
+    '11': { class_type: 'DualCLIPLoader', inputs: { clip_name1: 't5xxl_fp16.safetensors', clip_name2: 'clip_l.safetensors', type: 'flux' } },
+    '12': { class_type: 'VAELoader', inputs: { vae_name: 'ae.safetensors' } },
+    '13': { class_type: 'VAEEncode', inputs: { pixels: ['1', 0], vae: ['12', 0] } },
+    '14': { class_type: 'CLIPTextEncode', inputs: { clip: ['11', 0], text: p.positive } },
+    '15': { class_type: 'FluxGuidance', inputs: { conditioning: ['14', 0], guidance: 3.5 } },
+    '16': { class_type: 'CLIPTextEncode', inputs: { clip: ['11', 0], text: '' } },
+    '17': { class_type: 'KSampler', inputs: { model: ['10', 0], positive: ['15', 0], negative: ['16', 0], latent_image: ['13', 0], seed, steps: p.steps ?? 24, cfg: 1, sampler_name: 'euler', scheduler: 'simple', denoise: p.denoise ?? 0.65 } },
+    '18': { class_type: 'VAEDecode', inputs: { samples: ['17', 0], vae: ['12', 0] } },
+    '19': { class_type: 'SaveImage', inputs: { images: ['18', 0], filename_prefix: 'wordwerx_reangle' } },
+  };
+}
+
 // --- Expression edit (Flux Kontext: ref image + instruction) ------------------
 // REPRESENTATIVE — validate node names against your Kontext build.
 export function expressionEdit(p: { refImageName: string; instruction: string; seed?: number }): Record<string, any> {

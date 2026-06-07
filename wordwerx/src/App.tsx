@@ -13,6 +13,7 @@ import { Narrative } from './narrative';
 import { VisualDev } from './visdev';
 import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
+import { getBalance } from './services/runpod';
 import { getState, patchState, setLink as apiSetLink, type StoreLinks } from './services/store';
 import { UIContext, useUIProvider, Lightbox } from './ui-context';
 
@@ -104,6 +105,13 @@ export default function App() {
 
   const ui = useUIProvider();
   const [navOpen, setNavOpen] = React.useState(true);
+  const [balance, setBalance] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    const load = () => getBalance().then(b => setBalance(b.balance)).catch(() => {});
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, []);
 
   const activeObj = series.find(s => s.id === activeSeries) || series[0];
   const isEcho = activeSeries === 'echo';
@@ -141,7 +149,7 @@ export default function App() {
     <div className={cx('ww-app', 'dens-' + (t.density || 'regular'), !navOpen && 'nav-collapsed')} style={{ ...rootStyle, '--dens': dens } as any}>
       {!navOpen && <button className="ww-nav-reopen" title="Show menu" onClick={() => setNavOpen(true)}>☰</button>}
       {/* NAVIGATOR */}
-      <nav className="ww-nav2">
+      <nav className="ww-nav2" style={navOpen ? undefined : { display: 'none' }}>
         <button className="ww-nav-collapse" title="Hide menu" onClick={() => setNavOpen(false)}>«</button>
         <div className="ww-nav2-brand">
           <img className="ww-nav-logo-sm" src="/src/assets/brand/wordwerx-logo-dark.svg" alt="WORDWERX" onClick={() => setWs('series')} style={{ cursor: 'pointer' }} />
@@ -154,6 +162,9 @@ export default function App() {
               <path d="M8 5.5 Q10 3 12 5.5" />
             </svg>
           </button>
+          {balance != null && (
+            <span className={cx('ww-nav-credits', balance < 1 && 'is-low')} title={`RunPod credits remaining: $${balance.toFixed(2)}`}>${balance.toFixed(2)}</span>
+          )}
           <button className="ww-nav-icon-btn" title="Notifications — click to clear" onClick={ui.clearNotif}>
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 2 C7 3 6 5.5 6 8 L6 13 L4 14 L16 14 L14 13 L14 8 C14 5.5 13 3 10 2 Z" />

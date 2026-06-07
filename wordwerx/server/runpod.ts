@@ -43,6 +43,17 @@ export async function getStatus(jobId: string): Promise<any> {
   return res.json();
 }
 
+/** Account credit balance (USD) via the GraphQL API. */
+export async function getBalance(): Promise<{ balance: number; spendPerHr: number }> {
+  const res = await fetch('https://api.runpod.io/graphql', {
+    method: 'POST', headers: headers(),
+    body: JSON.stringify({ query: 'query{ myself{ clientBalance currentSpendPerHr } }' }),
+  });
+  const j: any = await res.json();
+  const m = j?.data?.myself || {};
+  return { balance: m.clientBalance ?? 0, spendPerHr: m.currentSpendPerHr ?? 0 };
+}
+
 /** Cancel a running/queued job. */
 export async function cancelJob(jobId: string): Promise<any> {
   const res = await fetch(`${API_BASE}/${endpointId()}/cancel/${jobId}`, { method: 'POST', headers: headers() });

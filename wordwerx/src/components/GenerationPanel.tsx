@@ -21,10 +21,22 @@ export interface GenerationPanelProps {
   online?: boolean;                     // false => Generate disabled
   buttonLabel?: string;
   plainBgDefault?: boolean;             // default the "plain background" toggle on
+  fullBody?: boolean;                   // force full-body framing (character refs)
   negativeDefault?: string;
   flash?: (m: string) => void;
+  onPending?: (n: number) => void;      // n placeholder slots while generating (0 = done)
   onResult: (assets: GenResult[], ctx: { useCase: UseCase; prompt: string; lora?: string }) => void | Promise<void>;
 }
+
+// Per-model capabilities + best-practice defaults.
+function modelOf(useCase: UseCase): 'flux' | 'sdxl' {
+  return useCase === 'txt2img-sdxl' ? 'sdxl' : 'flux';
+}
+const MODEL_DEFAULTS = {
+  flux: { steps: 20, negatives: false },   // distilled: cfg=1, no negative prompt
+  sdxl: { steps: 28, negatives: true },
+} as const;
+const FULL_BODY = ', full-body shot, head to toe, entire body and feet visible, full-length, standing, centered';
 
 interface AdvOpts { prompt: string; lora?: string; count?: number; controlType?: 'canny' | 'depth'; negative?: string; seed?: number; steps?: number; width?: number; height?: number }
 
@@ -56,9 +68,11 @@ export function GenerationPanel(p: GenerationPanelProps) {
   const [negative, setNegative] = React.useState(p.negativeDefault ?? '');
   const [seedLock, setSeedLock] = React.useState(false);
   const [seed, setSeed] = React.useState(0);
-  const [steps, setSteps] = React.useState(0);     // 0 = builder default
-  const [width, setWidth] = React.useState(1024);
-  const [height, setHeight] = React.useState(1024);
+  const model = modelOf(useCase);
+  const caps = MODEL_DEFAULTS[model];
+  const [steps, setSteps] = React.useState<number>(caps.steps);   // best default for the model
+  const [width, setWidth] = React.useState(p.fullBody ? 832 : 1024);
+  const [height, setHeight] = React.useState(p.fullBody ? 1216 : 1024);
   const [plainBg, setPlainBg] = React.useState(!!p.plainBgDefault);
   const jobRef = React.useRef<string | null>(null);
   const cancelledRef = React.useRef(false);
@@ -66,6 +80,8 @@ export function GenerationPanel(p: GenerationPanelProps) {
   React.useEffect(() => { if (p.showLora) listLoras().then(setLoras).catch(() => {}); }, [p.showLora]);
   React.useEffect(() => { if (p.initialPrompt !== undefined) setPrompt(p.initialPrompt); }, [p.initialPrompt]);
   React.useEffect(() => { if (p.lora !== undefined) setLora(p.lora); }, [p.lora]);
+  // When the model changes, reset steps to that model's best default.
+  React.useEffect(() => { setSteps(MODEL_DEFAULTS[modelOf(useCase)].steps); }, [useCase]);
 
   const meta = USE_CASES.find(u => u.id === useCase);
   const needsRef = meta?.needsRefImage;
@@ -76,11 +92,13 @@ export function GenerationPanel(p: GenerationPanelProps) {
 
   async function run() {
     setBusy(true); setStatus('Submitting…'); cancelledRef.current = false;
+    const expected = useCase === 'dataset-batch' ? (p.count ?? 8) : 1;
+    p.onPending?.(expected);
     try {
-      const positive = prompt + (plainBg ? PLAIN_BG : '');
+      const positive = prompt + (plainBg ? PLAIN_BG : '') + (p.fullBody ? FULL_BODY : '');
       const wf = buildWorkflow(useCase, {
         prompt: positive, lora: effectiveLora || undefined, count: p.count, controlType,
-        negative: negative || undefined, seed: seedLock ? seed : undefined,
+        negative: caps.negatives ? (negative || undefined) : undefined, seed: seedLock ? seed : undefined,
         steps: steps || undefined, width, height,
       });
       const images = p.refImage ? [{ name: 'ref.png', image: p.refImage }] : undefined;
@@ -96,7 +114,7 @@ export function GenerationPanel(p: GenerationPanelProps) {
     } catch (e: any) {
       if (cancelledRef.current) p.flash?.('Generation cancelled');
       else { ui.notifyError(); p.flash?.('Generation failed: ' + e.message); }
-    } finally { setBusy(false); setStatus(null); jobRef.current = null; }
+    } finally { setBusy(false); setStatus(null); jobRef.current = null; p.onPending?.(0); }
   }
 
   async function cancel() {
@@ -140,27 +158,27 @@ export function GenerationPanel(p: GenerationPanelProps) {
 
       <div className="ww-adv">
         <button className="ww-adv-head" onClick={() => setAdvOpen(o => !o)}>
-          <span style={{ fontSize: 10 }}>{advOpen ? '▾' : '▸'}</span> Advanced settings {seedLock && <span className="ww-offline" style={{ color: 'var(--accent2)', background: 'color-mix(in oklab,var(--accent2) 16%,transparent)' }}>seed locked</span>}
+          <span style={{ fontSize: 10 }}>{advOpen ? '▾' : '▸'}</span> Advanced settings · {model.toUpperCase()} {seedLock && <span className="ww-offline" style={{ color: 'var(--accent2)', background: 'color-mix(in oklab,var(--accent2) 16%,transparent)' }}>seed locked</span>}
         </button>
         {advOpen && (
           <div className="ww-adv-body">
-            <label className="ww-adv-full">Negative prompt (SDXL)
-              <input value={negative} placeholder="things to avoid…" onChange={e => setNegative(e.target.value)} />
-            </label>
+            {caps.negatives && (
+              <label className="ww-adv-full">Negative prompt
+                <input value={negative} placeholder="things to avoid…" onChange={e => setNegative(e.target.value)} />
+              </label>
+            )}
             <label>Seed
               <div style={{ display: 'flex', gap: 6 }}>
                 <input type="number" value={seed} disabled={!seedLock} onChange={e => setSeed(+e.target.value)} style={{ flex: 1 }} />
                 <button className="ww-filter" style={{ padding: '0 8px' }} title="Lock seed for reproducible results" onClick={() => setSeedLock(v => !v)}>{seedLock ? '🔒' : '🎲'}</button>
               </div>
             </label>
-            <label>Steps (0 = default)
-              <input type="number" value={steps} onChange={e => setSteps(+e.target.value)} />
-            </label>
+            <label>Steps<input type="number" value={steps} onChange={e => setSteps(+e.target.value)} /></label>
             <label>Width<input type="number" step={64} value={width} onChange={e => setWidth(+e.target.value)} /></label>
             <label>Height<input type="number" step={64} value={height} onChange={e => setHeight(+e.target.value)} /></label>
-            <label className="ww-adv-full" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={plainBg} style={{ width: 'auto', height: 'auto' }} onChange={e => setPlainBg(e.target.checked)} />
-              Plain background (clean backdrop — best for character references)
+            <label className="ww-adv-toggle ww-adv-full">
+              <input type="checkbox" checked={plainBg} onChange={e => setPlainBg(e.target.checked)} />
+              <span><b>Plain background</b> — clean studio backdrop, recommended for character references</span>
             </label>
           </div>
         )}

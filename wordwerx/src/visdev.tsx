@@ -4,7 +4,7 @@ import { VISDEV, BIBLE } from './world';
 import { Scene } from './scenes';
 import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import { generate, imageSrc } from './services/runpod';
-import { expressionEdit } from './workflows';
+import { expressionEdit, img2imgFlux } from './workflows';
 import { assetUrl, assetIdOf, loadAssetDataUrl, saveAsset } from './services/store';
 import { useUI } from './ui-context';
 
@@ -22,10 +22,11 @@ const NEG_DEFAULT = 'lowres, bad anatomy, extra limbs, watermark, text, busy bac
 
 let __vdT: ReturnType<typeof setTimeout> | undefined;
 
-// Zoomable image (opens the global lightbox), with a Scene fallback.
-function Thumb({ url, scene, style }: { url?: string; scene?: string; style?: React.CSSProperties }) {
+// Image thumbnail. By default click opens the global lightbox; pass onSelect to
+// instead preview it elsewhere (e.g. the model-sheet hero).
+function Thumb({ url, scene, style, onSelect }: { url?: string; scene?: string; style?: React.CSSProperties; onSelect?: (url: string) => void }) {
   const ui = useUI();
-  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }} onClick={e => { e.stopPropagation(); ui.openImage(url); }} />;
+  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }} onClick={e => { e.stopPropagation(); onSelect ? onSelect(url) : ui.openImage(url); }} />;
   return <Scene kind={scene || 'tunnels'} />;
 }
 
@@ -71,6 +72,8 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
   const setVariantState = (subjId: string, v: string, state: string) =>
     patchSubject(subjId, s => ({ ...s, variants: s.variants.map((vr: any) => vr.v === v ? { ...vr, state } : vr) }));
   function deleteVariant(subjId: string, v: string) {
+    const subj = subjects.find((s: any) => s.id === subjId);
+    if (subj?.locked === v && !window.confirm(`“${v}” is the locked canonical image for ${subj.subject}. Deleting it will unlock the subject and break its model sheet. Delete anyway?`)) return;
     patchSubject(subjId, s => ({ ...s, variants: s.variants.filter((vr: any) => vr.v !== v), locked: s.locked === v ? null : s.locked }));
     flash('Variant deleted');
   }
@@ -157,6 +160,7 @@ function SubjectSidebar({ subjects, selId, setSelId }: any) {
 }
 
 function VariantInspector({ subj, online, charLora, appearance, flash, onLock, onSetState, onDelete, onVariant, isCharacter }: any) {
+  const [pending, setPending] = React.useState(0);
   const appear = (appearance && appearance[subj.id]) || (BIBLE || {})[subj.id]?.appearance || '';
   return (
     <div>
@@ -183,13 +187,17 @@ function VariantInspector({ subj, online, charLora, appearance, flash, onLock, o
         workflows={['txt2img-flux', 'txt2img-sdxl']}
         initialPrompt={appear ? `${appear} — ${subj.brief}` : subj.brief}
         lora={isCharacter ? charLora : undefined}
-        plainBgDefault={isCharacter} negativeDefault={NEG_DEFAULT}
+        plainBgDefault={isCharacter} fullBody={isCharacter} negativeDefault={NEG_DEFAULT}
         online={online} flash={flash} buttonLabel="✦ Generate variant"
+        onPending={setPending}
         onResult={(assets: GenResult[]) => assets.forEach(a => onVariant(subj.id, a.url))}
       />
 
       <div className="ww-insp-sub" style={{ marginBottom: 12, marginTop: 18 }}>Variants · {subj.variants.length}</div>
       <div className="ww-vargrid">
+        {Array.from({ length: pending }).map((_, i) => (
+          <div key={'sk' + i} className="ww-varcard"><div className="ww-varcard-art ww-skel"><span className="ww-skel-tag">generating…</span></div><div className="ww-varcard-body"><div className="ww-varcard-state">Queued</div></div></div>
+        ))}
         {subj.variants.map((v: any) => {
           const meta = STATE_META[v.state] || STATE_META.Explored;
           const locked = subj.locked === v.v;
@@ -223,6 +231,16 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
   const exprs: string[] = subj.sheet?.expressions || [];
   const [busy, setBusy] = React.useState<string | null>(null);
   const disabled = !canonical || online === false || !!busy;
+  // Inline preview: clicking a pose/expression shows it big here (not a popup).
+  const [preview, setPreview] = React.useState<{ url?: string; label: string }>({ label: 'Canonical' });
+  const heroUrl = preview.url || canonical;
+  const cell = (label: string, url?: string) => (
+    <div className="ww-sheet-cell" key={label}>
+      <div className={cx('ww-sheet-cell-art', preview.url === url && url && 'is-sel')}>
+        <Thumb url={url} scene={subj.scene} onSelect={u => setPreview({ url: u, label })} />
+      </div><span>{label}</span>
+    </div>
+  );
 
   async function run(kind: 'poses' | 'expressions', labels: string[]) {
     setBusy(kind); try { await onGenSheet(subj.id, kind, labels); } finally { setBusy(null); }
@@ -239,7 +257,10 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
       </div>
       {!canonical && <div className="ww-sheet-empty" style={{ marginBottom: 18 }}><b>No canonical image yet</b><p>Generate a variant on the Prototype board and lock it — the sheet is built by editing that canonical image.</p></div>}
 
-      <div className="ww-sheet-hero"><Thumb url={canonical} scene={subj.scene} /></div>
+      <div className="ww-sheet-hero">
+        <Thumb url={heroUrl} scene={subj.scene} />
+        <div className="ww-sheet-hero-tag">{subj.subject}{preview.label ? ` · ${preview.label}` : ''}</div>
+      </div>
 
       <div className="ww-sheet-cols">
         <div className="ww-sheet-block">
@@ -248,7 +269,7 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
             <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('poses', poses)}>{busy === 'poses' ? 'Generating…' : '✦ Generate poses'}</button>
           </div>
           <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(poses.length, 4)},1fr)` }}>
-            {poses.map((pose, i) => <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art"><Thumb url={subj.sheetImgs?.poses?.[pose]} scene={subj.scene} /></div><span>{pose}</span></div>)}
+            {poses.map(pose => cell(pose, subj.sheetImgs?.poses?.[pose]))}
           </div>
         </div>
         {exprs.length > 0 && (
@@ -258,7 +279,7 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
               <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('expressions', exprs)}>{busy === 'expressions' ? 'Generating…' : '✦ Generate expressions'}</button>
             </div>
             <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(exprs.length, 4)},1fr)` }}>
-              {exprs.map((expr, i) => <div key={i} className="ww-sheet-cell"><div className="ww-sheet-cell-art"><Thumb url={subj.sheetImgs?.expressions?.[expr]} scene={subj.scene} /></div><span>{expr}</span></div>)}
+              {exprs.map(expr => cell(expr, subj.sheetImgs?.expressions?.[expr]))}
             </div>
           </div>
         )}
@@ -267,14 +288,35 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
   );
 }
 
-// New angles of a location from a base image. Uses Flux Kontext (instruction edit)
-// which re-interprets the view, rather than ControlNet which locks composition.
-function Locations({ online, flash, links, updateLink }: any) {
+// New angles of a location from a base image, via Flux img2img at an adjustable
+// variation strength. Low strength keeps it close to the source; higher strength
+// lets the camera angle actually shift (at some cost to exact consistency).
+function Locations({ online, flash, updateLink }: any) {
   const ui = useUI();
   const [ref, setRef] = React.useState<string | null>(null);
-  const [angles, setAngles] = React.useState<string[]>(() => (Object.values(links?.locationAngles || {}).flat() as string[]));
+  const [prompt, setPrompt] = React.useState('');
+  const [strength, setStrength] = React.useState(0.65);
+  const [busy, setBusy] = React.useState(false);
+  const [pending, setPending] = React.useState(0);
+  const [angles, setAngles] = React.useState<string[]>([]);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const pickRef = (file: File) => { const r = new FileReader(); r.onloadend = () => setRef(r.result as string); r.readAsDataURL(file); };
+
+  async function generateAngle() {
+    if (!ref) return flash('Load a location image first.');
+    if (!prompt.trim()) return flash('Describe the new angle.');
+    setBusy(true); setPending(1);
+    try {
+      const imgs = await generate(img2imgFlux({ refImageName: 'ref.png', positive: `${prompt}, same location, consistent architecture and lighting`, denoise: strength }), { images: [{ name: 'ref.png', image: ref }] });
+      if (imgs[0]) {
+        const saved = await saveAsset(imageSrc(imgs[0]), { workflow: 'reangle', prompt, strength });
+        setAngles(a => [saved.url, ...a]);
+        updateLink?.('locationAngles', 'session', [saved.url, ...angles]);
+        ui.notifyDone(1); flash('New angle generated');
+      }
+    } catch (e: any) { ui.notifyError(); flash('Failed: ' + e.message); }
+    finally { setBusy(false); setPending(0); }
+  }
 
   return (
     <div className="ww-sheet">
@@ -282,7 +324,7 @@ function Locations({ online, flash, links, updateLink }: any) {
         <div>
           <div className="ww-pv-kicker">Visual Dev · Locations</div>
           <h2>New perspectives</h2>
-          <p>Load a location image, then describe a new camera angle (e.g. “from a high balcony looking down”). Uses instruction-editing to re-frame the same place.</p>
+          <p>Load a location image, describe a new camera angle, and set how far to deviate. Lower = closer to the source; higher = a bigger angle change.</p>
         </div>
         <button className="ww-filter" onClick={() => fileRef.current?.click()}>⤓ Load location image</button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) pickRef(f); e.currentTarget.value = ''; }} />
@@ -290,20 +332,27 @@ function Locations({ online, flash, links, updateLink }: any) {
       {ref ? (
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 18 }}>
           <div style={{ width: 200, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}><img className="ww-zoomable" src={ref} alt="reference" style={{ width: '100%', display: 'block' }} onClick={() => ui.openImage(ref)} /></div>
-          <div style={{ flex: 1 }}>
-            <GenerationPanel
-              workflows={['expression-edit']} refImage={ref} online={online} flash={flash}
-              promptLabel="Describe the new angle, e.g. 'same street from a high balcony looking down'"
-              buttonLabel="✦ Generate new angle"
-              onResult={(assets: GenResult[]) => { const urls = assets.map(a => a.url); setAngles(a => [...urls, ...a]); updateLink?.('locationAngles', 'session', [...urls, ...angles]); }}
-            />
+          <div style={{ flex: 1 }} className="ww-gen">
+            <div className="ww-gen-head"><span className="ww-cop-orb" /> New angle {online === false && <span className="ww-offline">offline</span>}</div>
+            <textarea className="ww-gen-prompt" rows={2} value={prompt} placeholder="e.g. 'the same street seen from a high balcony looking down'" onChange={e => setPrompt(e.target.value)} />
+            <div className="ww-gen-row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: 'var(--ink2)', flex: 1, minWidth: 200 }}>
+                Variation
+                <input type="range" min={0.35} max={0.85} step={0.05} value={strength} onChange={e => setStrength(+e.target.value)} style={{ flex: 1 }} />
+                <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{Math.round(strength * 100)}%</b>
+              </label>
+              <button className={cx('ww-gen-btn', (busy || online === false || !prompt.trim()) && 'is-offline')} disabled={busy || online === false || !prompt.trim()} onClick={generateAngle}>{busy ? 'Generating…' : '✦ Generate angle'}</button>
+            </div>
           </div>
         </div>
       ) : <div className="ww-sheet-empty" style={{ marginBottom: 18 }}><b>Load a location image to begin</b><p>Then describe the new camera angle.</p></div>}
-      {angles.length > 0 && (
+      {(angles.length > 0 || pending > 0) && (
         <>
           <div className="ww-insp-sub" style={{ marginBottom: 10 }}>Generated angles · {angles.length}</div>
-          <div className="ww-gen-gallery">{angles.map((u, i) => <div key={i} style={{ borderRadius: 10, overflow: 'hidden' }}><Thumb url={u} /></div>)}</div>
+          <div className="ww-gen-gallery">
+            {Array.from({ length: pending }).map((_, i) => <div key={'sk' + i} className="ww-thumb-art ww-skel" style={{ borderRadius: 10, aspectRatio: '1.5' }}><span className="ww-skel-tag">generating…</span></div>)}
+            {angles.map((u, i) => <div key={i} style={{ borderRadius: 10, overflow: 'hidden' }}><Thumb url={u} /></div>)}
+          </div>
         </>
       )}
     </div>
