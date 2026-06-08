@@ -26,6 +26,7 @@ export interface Db {
     visdevVariant: Record<string, string>;         // "subj:v" -> assetId
     visdevCanonical: Record<string, { v: string; assetId: string }>;
     panelImage: Record<string, string>;            // panelId -> assetId
+    layerImage: Record<string, string>;            // "panelId:layerIdx" -> assetId
     locationAngles: Record<string, string[]>;      // subj -> assetId[]
   };
   state: { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> };
@@ -33,7 +34,7 @@ export interface Db {
 
 const EMPTY: Db = {
   assets: {},
-  links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, locationAngles: {} },
+  links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, layerImage: {}, locationAngles: {} },
   state: { library: [], appearance: {}, visdevExtra: {} },
 };
 
@@ -115,7 +116,7 @@ export async function patchState(patch: { links?: Partial<Db['links']>; state?: 
   await writeDb(db);
 }
 
-const LINK_KEYS = ['characterLora', 'characterPortrait', 'visdevVariant', 'visdevCanonical', 'panelImage', 'locationAngles'] as const;
+const LINK_KEYS = ['characterLora', 'characterPortrait', 'visdevVariant', 'visdevCanonical', 'panelImage', 'layerImage', 'locationAngles'] as const;
 export type LinkKey = typeof LINK_KEYS[number];
 export function isLinkKey(k: string): k is LinkKey { return (LINK_KEYS as readonly string[]).includes(k); }
 

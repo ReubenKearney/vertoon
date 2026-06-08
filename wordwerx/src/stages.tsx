@@ -108,16 +108,18 @@ export function Story({ panels }: any) {
 export function Publish({ panels, links, flash }: any) {
   const story = (panels || []).filter((p: any) => p.scene !== 'parallax_demo');
   const panelImage: Record<string, string> = links?.panelImage || {};
+  const layerImage: Record<string, string> = links?.layerImage || {};
   const [downscale, setDownscale] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<{ bytes: number; withArt: number } | null>(null);
-  const assigned = story.filter((p: any) => panelImage[p.id]).length;
+  const hasArt = (p: any) => panelImage[p.id] || (p.layers || []).some((_: any, i: number) => layerImage[`${p.id}:${i}`]);
+  const assigned = story.filter(hasArt).length;
 
   async function exportComic() {
     setBusy(true);
     try {
-      const pp: PublishPanel[] = story.map((p: any, i: number) => ({ id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360 }));
-      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: EPISODE.title, series: EPISODE.series, panelImage, downscale });
+      const pp: PublishPanel[] = story.map((p: any, i: number) => ({ id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360, layers: p.layers?.length }));
+      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: EPISODE.title, series: EPISODE.series, panelImage, layerImage, downscale });
       downloadHtml(html, `echos-location-ep01.html`);
       setResult({ bytes, withArt });
       flash?.(`Exported offline comic · ${(bytes / 1e6).toFixed(2)} MB`);

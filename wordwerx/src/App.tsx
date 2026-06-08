@@ -150,7 +150,6 @@ export default function App() {
       {!navOpen && <button className="ww-nav-reopen" title="Show menu" onClick={() => setNavOpen(true)}>☰</button>}
       {/* NAVIGATOR */}
       <nav className="ww-nav2" style={navOpen ? undefined : { display: 'none' }}>
-        <button className="ww-nav-collapse" title="Hide menu" onClick={() => setNavOpen(false)}>«</button>
         <div className="ww-nav2-brand">
           <img className="ww-nav-logo-sm" src="/src/assets/brand/wordwerx-logo-dark.svg" alt="WORDWERX" onClick={() => setWs('series')} style={{ cursor: 'pointer' }} />
           <button className={cx('ww-nav-icon-btn', copilot && 'is-on')} title="Sherlock — your story co-pilot" onClick={() => setCopilot(c => !c)}>
@@ -217,6 +216,9 @@ export default function App() {
               )}
             </div>
           ))}
+        </div>
+        <div className="ww-nav2-foot">
+          <button className="ww-nav-collapse" title="Hide menu" onClick={() => setNavOpen(false)}>« Hide menu</button>
         </div>
       </nav>
 

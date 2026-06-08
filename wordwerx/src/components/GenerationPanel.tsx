@@ -13,6 +13,10 @@ export interface GenResult { id: string; url: string }
 export interface GenerationPanelProps {
   workflows: UseCase[];                 // which use cases to offer (>=1)
   initialPrompt?: string;
+  prompt?: string;                      // controlled prompt (persisted by parent)
+  onPromptChange?: (v: string) => void;
+  negative?: string;                    // controlled negative
+  onNegativeChange?: (v: string) => void;
   promptLabel?: string;                 // textarea placeholder hint
   showLora?: boolean;                   // show LoRA picker
   lora?: string;                        // forced LoRA (e.g. a character's); used even if picker hidden
@@ -57,15 +61,21 @@ const PLAIN_BG = ', isolated subject on a plain neutral light-grey studio backgr
 export function GenerationPanel(p: GenerationPanelProps) {
   const ui = useUI();
   const [useCase, setUseCase] = React.useState<UseCase>(p.workflows[0]);
-  const [prompt, setPrompt] = React.useState(p.initialPrompt ?? '');
+  const [internalPrompt, setInternalPrompt] = React.useState(p.initialPrompt ?? '');
+  const prompt = p.prompt !== undefined ? p.prompt : internalPrompt;
+  const setPrompt = (v: string) => (p.onPromptChange ? p.onPromptChange(v) : setInternalPrompt(v));
   const [lora, setLora] = React.useState(p.lora ?? '');
   const [loras, setLoras] = React.useState<Lora[]>([]);
   const [controlType, setControlType] = React.useState<'canny' | 'depth'>('canny');
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState<string | null>(null);
+  const [elapsed, setElapsed] = React.useState(0);
+  const tickRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   // Advanced / deterministic settings.
   const [advOpen, setAdvOpen] = React.useState(false);
-  const [negative, setNegative] = React.useState(p.negativeDefault ?? '');
+  const [internalNeg, setInternalNeg] = React.useState(p.negativeDefault ?? '');
+  const negative = p.negative !== undefined ? p.negative : internalNeg;
+  const setNegative = (v: string) => (p.onNegativeChange ? p.onNegativeChange(v) : setInternalNeg(v));
   const [seedLock, setSeedLock] = React.useState(false);
   const [seed, setSeed] = React.useState(0);
   const model = modelOf(useCase);
@@ -78,7 +88,8 @@ export function GenerationPanel(p: GenerationPanelProps) {
   const cancelledRef = React.useRef(false);
 
   React.useEffect(() => { if (p.showLora) listLoras().then(setLoras).catch(() => {}); }, [p.showLora]);
-  React.useEffect(() => { if (p.initialPrompt !== undefined) setPrompt(p.initialPrompt); }, [p.initialPrompt]);
+  // Only seed the internal prompt when uncontrolled.
+  React.useEffect(() => { if (p.prompt === undefined && p.initialPrompt !== undefined) setInternalPrompt(p.initialPrompt); }, [p.initialPrompt, p.prompt]);
   React.useEffect(() => { if (p.lora !== undefined) setLora(p.lora); }, [p.lora]);
   // When the model changes, reset steps to that model's best default.
   React.useEffect(() => { setSteps(MODEL_DEFAULTS[modelOf(useCase)].steps); }, [useCase]);
@@ -92,6 +103,8 @@ export function GenerationPanel(p: GenerationPanelProps) {
 
   async function run() {
     setBusy(true); setStatus('Submitting…'); cancelledRef.current = false;
+    setElapsed(0);
+    tickRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
     const expected = useCase === 'dataset-batch' ? (p.count ?? 8) : 1;
     p.onPending?.(expected);
     try {
@@ -114,7 +127,15 @@ export function GenerationPanel(p: GenerationPanelProps) {
     } catch (e: any) {
       if (cancelledRef.current) p.flash?.('Generation cancelled');
       else { ui.notifyError(); p.flash?.('Generation failed: ' + e.message); }
-    } finally { setBusy(false); setStatus(null); jobRef.current = null; p.onPending?.(0); }
+    } finally { setBusy(false); setStatus(null); jobRef.current = null; p.onPending?.(0); if (tickRef.current) clearInterval(tickRef.current); }
+  }
+
+  // Friendly status + rough countdown (cold start ≈ up to ~2 min).
+  function statusLine(): string {
+    if (!busy) return offline ? 'Offline — generation paused' : missingRef ? 'Needs a reference image' : (p.lora ? `LoRA: ${p.lora.replace('.safetensors', '')}` : 'Ready');
+    const est = 120, left = Math.max(0, est - elapsed);
+    const phase = status === 'IN_QUEUE' ? 'Warming up (cold start)' : status === 'IN_PROGRESS' ? 'Rendering' : 'Submitting';
+    return `${phase} · ${elapsed}s${left > 0 ? ` · ~${left}s left` : ' · almost done'}`;
   }
 
   async function cancel() {
@@ -148,9 +169,7 @@ export function GenerationPanel(p: GenerationPanelProps) {
             {loras.map(l => <option key={l.name} value={l.name}>{l.name.replace('.safetensors', '')}</option>)}
           </select>
         )}
-        <div className="ww-gen-style">
-          {offline ? 'Offline — generation paused' : missingRef ? 'Needs a reference image' : status || (p.lora ? `LoRA: ${p.lora.replace('.safetensors', '')}` : 'Ready')}
-        </div>
+        <div className="ww-gen-style">{statusLine()}</div>
         {busy
           ? <button className="ww-gen-btn" onClick={cancel}>Cancel</button>
           : <button className={cx('ww-gen-btn', !canRun && 'is-offline')} onClick={run} disabled={!canRun}>{p.buttonLabel || '✦ Generate'}</button>}

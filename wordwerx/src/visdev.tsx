@@ -26,7 +26,7 @@ let __vdT: ReturnType<typeof setTimeout> | undefined;
 // instead preview it elsewhere (e.g. the model-sheet hero).
 function Thumb({ url, scene, style, onSelect }: { url?: string; scene?: string; style?: React.CSSProperties; onSelect?: (url: string) => void }) {
   const ui = useUI();
-  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', ...style }} onClick={e => { e.stopPropagation(); onSelect ? onSelect(url) : ui.openImage(url); }} />;
+  if (url) return <img className="ww-zoomable" src={assetUrl(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', ...style }} onClick={e => { e.stopPropagation(); onSelect ? onSelect(url) : ui.openImage(url); }} />;
   return <Scene kind={scene || 'tunnels'} />;
 }
 
@@ -133,8 +133,9 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
                 ) : tab === 'board'
                   ? <VariantInspector subj={sel} online={online} charLora={links?.characterLora?.[sel.id]?.loraName}
                       appearance={appearance} flash={flash} onLock={lockVariant} onSetState={setVariantState}
-                      onDelete={deleteVariant} onVariant={addVariant} isCharacter={isCharacter(sel)} />
-                  : <ModelSheet subj={sel} online={online} onGenSheet={genSheet} />}
+                      onDelete={deleteVariant} onVariant={addVariant} isCharacter={isCharacter(sel)}
+                      onField={(f: string, v: any) => patchSubject(sel.id, (s: any) => ({ ...s, [f]: v }))} />
+                  : <ModelSheet subj={sel} online={online} onGenSheet={genSheet} onField={(f: string, v: any) => patchSubject(sel.id, (s: any) => ({ ...s, [f]: v }))} />}
               </div>
             </div>
           )}
@@ -159,9 +160,10 @@ function SubjectSidebar({ subjects, selId, setSelId }: any) {
   );
 }
 
-function VariantInspector({ subj, online, charLora, appearance, flash, onLock, onSetState, onDelete, onVariant, isCharacter }: any) {
+function VariantInspector({ subj, online, charLora, appearance, flash, onLock, onSetState, onDelete, onVariant, isCharacter, onField }: any) {
   const [pending, setPending] = React.useState(0);
   const appear = (appearance && appearance[subj.id]) || (BIBLE || {})[subj.id]?.appearance || '';
+  const defaultPrompt = appear ? `${appear} — ${subj.brief}` : subj.brief;
   return (
     <div>
       <div className="ww-proto-brief">
@@ -184,10 +186,12 @@ function VariantInspector({ subj, online, charLora, appearance, flash, onLock, o
       )}
 
       <GenerationPanel
+        key={subj.id}
         workflows={['txt2img-flux', 'txt2img-sdxl']}
-        initialPrompt={appear ? `${appear} — ${subj.brief}` : subj.brief}
+        prompt={subj.genPrompt ?? defaultPrompt} onPromptChange={(v: string) => onField('genPrompt', v)}
+        negative={subj.genNegative ?? NEG_DEFAULT} onNegativeChange={(v: string) => onField('genNegative', v)}
         lora={isCharacter ? charLora : undefined}
-        plainBgDefault={isCharacter} fullBody={isCharacter} negativeDefault={NEG_DEFAULT}
+        plainBgDefault={isCharacter} fullBody={isCharacter}
         online={online} flash={flash} buttonLabel="✦ Generate variant"
         onPending={setPending}
         onResult={(assets: GenResult[]) => assets.forEach(a => onVariant(subj.id, a.url))}
@@ -195,9 +199,6 @@ function VariantInspector({ subj, online, charLora, appearance, flash, onLock, o
 
       <div className="ww-insp-sub" style={{ marginBottom: 12, marginTop: 18 }}>Variants · {subj.variants.length}</div>
       <div className="ww-vargrid">
-        {Array.from({ length: pending }).map((_, i) => (
-          <div key={'sk' + i} className="ww-varcard"><div className="ww-varcard-art ww-skel"><span className="ww-skel-tag">generating…</span></div><div className="ww-varcard-body"><div className="ww-varcard-state">Queued</div></div></div>
-        ))}
         {subj.variants.map((v: any) => {
           const meta = STATE_META[v.state] || STATE_META.Explored;
           const locked = subj.locked === v.v;
@@ -220,31 +221,67 @@ function VariantInspector({ subj, online, charLora, appearance, flash, onLock, o
             </div>
           );
         })}
+        {Array.from({ length: pending }).map((_, i) => (
+          <div key={'sk' + i} className="ww-varcard"><div className="ww-varcard-art ww-skel"><span className="ww-skel-tag">generating…</span></div><div className="ww-varcard-body"><div className="ww-varcard-state">Queued</div></div></div>
+        ))}
       </div>
     </div>
   );
 }
 
-function ModelSheet({ subj, online, onGenSheet }: any) {
+function ModelSheet({ subj, online, onGenSheet, onField }: any) {
   const canonical = subj.variants.find((v: any) => v.v === subj.locked)?.imageUrl;
-  const poses: string[] = subj.sheet?.poses || ['Front', '3/4', 'Profile'];
-  const exprs: string[] = subj.sheet?.expressions || [];
+  // Poses/expressions are editable per asset (people vs objects differ).
+  const poses: string[] = subj.poses ?? subj.sheet?.poses ?? ['Front', '3/4', 'Profile'];
+  const exprs: string[] = subj.expressions ?? subj.sheet?.expressions ?? [];
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [editKind, setEditKind] = React.useState<'poses' | 'expressions' | null>(null);
   const disabled = !canonical || online === false || !!busy;
-  // Inline preview: clicking a pose/expression shows it big here (not a popup).
   const [preview, setPreview] = React.useState<{ url?: string; label: string }>({ label: 'Canonical' });
   const heroUrl = preview.url || canonical;
-  const cell = (label: string, url?: string) => (
-    <div className="ww-sheet-cell" key={label}>
-      <div className={cx('ww-sheet-cell-art', preview.url === url && url && 'is-sel')}>
-        <Thumb url={url} scene={subj.scene} onSelect={u => setPreview({ url: u, label })} />
-      </div><span>{label}</span>
-    </div>
-  );
 
   async function run(kind: 'poses' | 'expressions', labels: string[]) {
     setBusy(kind); try { await onGenSheet(subj.id, kind, labels); } finally { setBusy(null); }
   }
+  const editList = (field: 'poses' | 'expressions', items: string[], i: number, val: string) => {
+    const next = items.slice(); if (val === null as any) next.splice(i, 1); else next[i] = val; onField(field, next);
+  };
+
+  const block = (field: 'poses' | 'expressions', items: string[], label: string) => {
+    const editing = editKind === field;
+    return (
+      <div className="ww-sheet-block">
+        <div className="ww-sheet-blockhead">
+          <div className="ww-insp-sub">{label} · {items.length} <button className="ww-sheet-editlink" onClick={() => setEditKind(editing ? null : field)}>{editing ? 'done' : 'edit'}</button></div>
+          <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run(field, items)}>{busy === field ? 'Generating…' : `✦ Generate ${label.toLowerCase()}`}</button>
+        </div>
+        {editing ? (
+          <div className="ww-pose-edit">
+            {items.map((it, i) => (
+              <div key={i} className="ww-pose-editrow">
+                <input value={it} onChange={e => editList(field, items, i, e.target.value)} />
+                <button title="Remove" onClick={() => editList(field, items, i, null as any)}>✕</button>
+              </div>
+            ))}
+            <button className="ww-filter" onClick={() => onField(field, [...items, field === 'poses' ? 'New pose' : 'New expression'])}>＋ Add {field === 'poses' ? 'pose' : 'expression'}</button>
+          </div>
+        ) : items.length === 0 ? (
+          <p style={{ fontSize: 12, color: 'var(--ink3)' }}>None — click “edit” to add {label.toLowerCase()}.</p>
+        ) : (
+          <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)},1fr)` }}>
+            {items.map(it => {
+              const url = subj.sheetImgs?.[field]?.[it];
+              return (
+                <div className="ww-sheet-cell" key={it}>
+                  <div className={cx('ww-sheet-cell-art', preview.url === url && url && 'is-sel')}><Thumb url={url} scene={subj.scene} onSelect={u => setPreview({ url: u, label: it })} /></div><span>{it}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -263,26 +300,8 @@ function ModelSheet({ subj, online, onGenSheet }: any) {
       </div>
 
       <div className="ww-sheet-cols">
-        <div className="ww-sheet-block">
-          <div className="ww-sheet-blockhead">
-            <div className="ww-insp-sub">Poses · {poses.length}</div>
-            <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('poses', poses)}>{busy === 'poses' ? 'Generating…' : '✦ Generate poses'}</button>
-          </div>
-          <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(poses.length, 4)},1fr)` }}>
-            {poses.map(pose => cell(pose, subj.sheetImgs?.poses?.[pose]))}
-          </div>
-        </div>
-        {exprs.length > 0 && (
-          <div className="ww-sheet-block">
-            <div className="ww-sheet-blockhead">
-              <div className="ww-insp-sub">Expressions · {exprs.length}</div>
-              <button className={cx('ww-gen-btn', disabled && 'is-offline')} disabled={disabled} onClick={() => run('expressions', exprs)}>{busy === 'expressions' ? 'Generating…' : '✦ Generate expressions'}</button>
-            </div>
-            <div className="ww-sheet-row" style={{ gridTemplateColumns: `repeat(${Math.min(exprs.length, 4)},1fr)` }}>
-              {exprs.map(expr => cell(expr, subj.sheetImgs?.expressions?.[expr]))}
-            </div>
-          </div>
-        )}
+        {block('poses', poses, 'Poses')}
+        {block('expressions', exprs, 'Expressions')}
       </div>
     </div>
   );

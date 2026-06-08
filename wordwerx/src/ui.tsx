@@ -35,7 +35,7 @@ export function AssetThumb({ scene, label, sub, source, state, onClick, selected
     <button className={cx('ww-thumb', selected && 'is-sel', tall && 'is-tall')} onClick={onClick}>
       <div className="ww-thumb-art">
         {imageUrl
-          ? <img className="ww-zoomable" src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onClick={e => { e.stopPropagation(); ui.openImage(imageUrl); }} />
+          ? <img className="ww-zoomable" src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} onClick={e => { e.stopPropagation(); ui.openImage(imageUrl); }} />
           : <Scene kind={scene} />}
       </div>
       <div className="ww-thumb-meta">

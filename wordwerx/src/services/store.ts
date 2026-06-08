@@ -8,6 +8,7 @@ export interface StoreLinks {
   visdevVariant: Record<string, string>;
   visdevCanonical: Record<string, { v: string; assetId: string }>;
   panelImage: Record<string, string>;
+  layerImage: Record<string, string>;
   locationAngles: Record<string, string[]>;
 }
 export interface StoreState { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> }

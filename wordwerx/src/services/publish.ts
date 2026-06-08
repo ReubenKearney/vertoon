@@ -3,8 +3,8 @@
 // requests). Panels without assigned art fall back to a tonal placeholder.
 import { loadAssetDataUrl } from './store';
 
-export interface PublishPanel { id: string; n: number; slug: string; caption?: string; speaker?: string; dialogue?: string; hue?: number }
-export interface PublishOpts { title: string; series: string; panelImage: Record<string, string>; downscale?: boolean }
+export interface PublishPanel { id: string; n: number; slug: string; caption?: string; speaker?: string; dialogue?: string; hue?: number; layers?: number }
+export interface PublishOpts { title: string; series: string; panelImage: Record<string, string>; layerImage?: Record<string, string>; downscale?: boolean }
 
 function downscaleDataUrl(dataUrl: string, maxEdge = 1080): Promise<string> {
   return new Promise((resolve) => {
@@ -24,9 +24,9 @@ function downscaleDataUrl(dataUrl: string, maxEdge = 1080): Promise<string> {
 
 function esc(s = ''): string { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!)); }
 
-function section(p: PublishPanel, img: string | null): string {
-  const art = img
-    ? `<img class="art" src="${img}" alt="${esc(p.slug)}">`
+function section(p: PublishPanel, imgs: string[]): string {
+  const art = imgs.length
+    ? `<div class="art">${imgs.map(u => `<img src="${u}" alt="${esc(p.slug)}">`).join('')}</div>`
     : `<div class="art ph" style="--h:${p.hue ?? 250}"></div>`;
   const cap = p.dialogue
     ? `<div class="cap"><b>${esc(p.speaker || '')}</b> ${esc(p.dialogue)}</div>`
@@ -38,12 +38,15 @@ export async function buildEpisodeHtml(panels: PublishPanel[], opts: PublishOpts
   let withArt = 0;
   const secs: string[] = [];
   for (const p of panels) {
-    const aid = opts.panelImage[p.id];
-    let img: string | null = null;
-    if (aid) {
-      try { img = await loadAssetDataUrl(aid); if (opts.downscale) img = await downscaleDataUrl(img); withArt++; } catch { img = null; }
+    // Composite the panel's layer images (back → front); else the legacy single image.
+    let ids = Array.from({ length: p.layers ?? 0 }).map((_, i) => opts.layerImage?.[`${p.id}:${i}`]).filter(Boolean) as string[];
+    if (!ids.length && opts.panelImage[p.id]) ids = [opts.panelImage[p.id]];
+    const imgs: string[] = [];
+    for (const aid of ids) {
+      try { let u = await loadAssetDataUrl(aid); if (opts.downscale) u = await downscaleDataUrl(u); imgs.push(u); } catch { /* skip */ }
     }
-    secs.push(section(p, img));
+    if (imgs.length) withArt++;
+    secs.push(section(p, imgs));
   }
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -58,7 +61,9 @@ body{background:#06070c;color:#ecedf2;font-family:system-ui,-apple-system,"Segoe
 .cover .s{color:#9aa0b4;font-size:13px}
 .panel{position:relative;min-height:62vh;display:flex;align-items:flex-end;opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}
 .panel.in{opacity:1;transform:none}
-.art{width:100%;display:block;border-radius:2px}
+.art{position:relative;width:100%;border-radius:2px;overflow:hidden}
+.art img{width:100%;display:block}
+.art img:not(:first-child){position:absolute;inset:0;height:100%;object-fit:contain}
 .art.ph{aspect-ratio:1/1;background:radial-gradient(80% 80% at 50% 35%,oklch(.5 .13 var(--h)),#0a0c12 80%)}
 .cap{position:absolute;left:0;right:0;bottom:0;padding:46px 22px 22px;font-size:15px;line-height:1.5;background:linear-gradient(0deg,rgba(6,7,12,.92),transparent)}
 .cap b{color:#16d6b4;font-weight:700;margin-right:6px}

@@ -402,7 +402,7 @@ textarea.ww-input{resize:vertical;line-height:1.55;}
 .ww-sheet-locktag{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#04221c;background:var(--accent2);padding:4px 9px;border-radius:6px;vertical-align:middle;}
 .ww-sheet-unlocktag{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#ffcf6a;background:rgba(255,207,106,.12);box-shadow:inset 0 0 0 1px rgba(255,207,106,.3);padding:4px 9px;border-radius:6px;}
 .ww-sheet-top p{margin:0;font-size:12.5px;color:var(--ink2);max-width:460px;line-height:1.55;}
-.ww-sheet-hero{aspect-ratio:1.6;border-radius:14px;overflow:hidden;position:relative;box-shadow:inset 0 0 0 1px var(--line2),var(--shadow);margin-bottom:8px;}
+.ww-sheet-hero{aspect-ratio:3.2;border-radius:14px;overflow:hidden;position:relative;box-shadow:inset 0 0 0 1px var(--line2),var(--shadow);margin-bottom:8px;background:#06070c;}
 .ww-sheet-hero .ww-scene{inset:-2px;}
 .ww-sheet-hero-tag{position:absolute;left:14px;bottom:12px;z-index:3;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;color:#fff;text-shadow:0 1px 6px #000;}
 .ww-sheet-cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px;}
@@ -469,9 +469,10 @@ img.ww-zoomable{cursor:zoom-in;}
 /* RunPod credits chip */
 .ww-nav-credits{font:700 11px/1 var(--font-mono);color:var(--accent2);background:color-mix(in oklab,var(--accent2) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--accent2) 32%,transparent);padding:5px 8px;border-radius:8px;white-space:nowrap;}
 .ww-nav-credits.is-low{color:#ff7a6a;background:color-mix(in oklab,#ff7a6a 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in oklab,#ff7a6a 36%,transparent);}
-.ww-nav-collapse{position:absolute;top:14px;right:10px;width:24px;height:24px;border-radius:7px;background:transparent;color:var(--ink2);border:none;cursor:pointer;font-size:13px;}
+.ww-nav2-foot{margin-top:auto;padding:10px;border-top:1px solid var(--line);flex-shrink:0;}
+.ww-nav-collapse{width:100%;padding:9px 11px;border-radius:8px;background:var(--bg2);color:var(--ink2);border:none;cursor:pointer;font:600 11.5px var(--font-ui);text-align:left;}
 .ww-nav-collapse:hover{background:var(--bg3);color:var(--ink);}
-.ww-nav-reopen{position:fixed;top:14px;left:12px;z-index:60;width:34px;height:34px;border-radius:9px;background:var(--bg2);color:var(--ink);border:none;cursor:pointer;font-size:16px;box-shadow:inset 0 0 0 1px var(--line2);}
+.ww-nav-reopen{position:fixed;bottom:14px;left:12px;z-index:60;width:38px;height:38px;border-radius:10px;background:var(--bg2);color:var(--ink);border:none;cursor:pointer;font-size:16px;box-shadow:inset 0 0 0 1px var(--line2),0 6px 18px rgba(0,0,0,.35);}
 .ww-nav-reopen:hover{background:var(--bg3);}
 
 /* Advanced settings disclosure */
@@ -498,3 +499,15 @@ img.ww-zoomable{cursor:zoom-in;}
 .ww-skel-tag{position:absolute;bottom:7px;left:9px;font:600 9px var(--font-mono);color:var(--ink2);z-index:1;}
 .ww-sheet-cell-art.is-sel{box-shadow:0 0 0 2px var(--accent2);}
 .ww-sheet-cell-art{cursor:pointer;}
+.ww-sheet-editlink{margin-left:7px;font:600 9.5px var(--font-mono);color:var(--accent);background:none;border:none;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;}
+.ww-sheet-editlink:hover{text-decoration:underline;}
+.ww-pose-edit{display:flex;flex-direction:column;gap:6px;}
+.ww-pose-editrow{display:flex;gap:6px;}
+.ww-pose-editrow input{flex:1;height:30px;border-radius:7px;background:var(--bg3);color:var(--ink);border:none;box-shadow:inset 0 0 0 1px var(--line);padding:0 9px;font-size:12px;}
+.ww-pose-editrow button{width:30px;border-radius:7px;background:var(--bg3);color:#ff7a6a;border:none;cursor:pointer;flex-shrink:0;}
+
+/* Per-layer panel art (Compose inspector) */
+.ww-layer-art{display:flex;gap:9px;align-items:flex-start;padding:8px;border-radius:9px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);margin-bottom:7px;}
+.ww-layer-nameinput{height:26px;border-radius:6px;background:var(--bg3);color:var(--ink);border:none;box-shadow:inset 0 0 0 1px var(--line);padding:0 8px;font-size:11.5px;font-weight:600;width:100%;}
+.ww-layer-del{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;}
+.ww-layer-del:hover{color:#ff7a6a;}
