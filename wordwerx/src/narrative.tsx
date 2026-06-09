@@ -1,8 +1,7 @@
 import React from 'react';
 import { cx } from './ui';
 import { StateDot, FxChip } from './ui';
-import { CHARACTERS, mkFx } from './data';
-import { ARCS, SEASONS, BIBLE } from './world';
+import { mkFx } from './data';
 import { Scene } from './scenes';
 import { assetUrl } from './services/store';
 import { useUI } from './ui-context';
@@ -17,9 +16,9 @@ const NARR_TABS = [
 function charAvatar(tint: number) { return { background: `radial-gradient(78% 78% at 50% 28%, oklch(0.55 0.14 ${tint}), #0a0c12 78%)` }; }
 function storyPanels(panels: any[]) { return panels.filter(p => p.scene !== 'parallax_demo'); }
 
-export function Narrative({ panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
+export function Narrative({ characters, addCharacter, seasons, arcs, bible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
   const counts = {
-    cast: CHARACTERS.length, arcs: ARCS.length,
+    cast: characters.length, arcs: arcs.length,
     beats: storyPanels(panels).length, script: storyPanels(panels).length,
   };
   return (
@@ -33,24 +32,42 @@ export function Narrative({ panels, setPanels, episode, tab, setTab, onGoVisual,
         ))}
       </div>
       <div className="ww-narr-body">
-        {tab === 'cast' && <Bible onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
-        {tab === 'arcs' && <ArcBoard />}
+        {tab === 'cast' && <Bible characters={characters} bible={bible} addCharacter={addCharacter} onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+        {tab === 'arcs' && <ArcBoard seasons={seasons} arcs={arcs} />}
         {tab === 'beats' && <BeatSheet panels={panels} setPanels={setPanels} episode={episode} />}
-        {tab === 'script' && <ScriptEditor panels={panels} setPanels={setPanels} episode={episode} />}
+        {tab === 'script' && <ScriptEditor panels={panels} setPanels={setPanels} episode={episode} characters={characters} />}
       </div>
     </div>
   );
 }
 
-function Bible({ onGoVisual, links, appearance, updateAppearance }: any) {
+function Bible({ characters, bible, addCharacter, onGoVisual, links, appearance, updateAppearance }: any) {
   const ui = useUI();
-  const chars = CHARACTERS;
-  const [selId, setSelId] = React.useState(chars[0].id);
-  const c = chars.find(x => x.id === selId) as any;
-  const b = BIBLE[selId] || {};
-  const appText = (appearance && appearance[selId] != null) ? appearance[selId] : (b.appearance || '');
+  const chars = characters as any[];
+  const [selId, setSelId] = React.useState<string | null>(chars[0]?.id ?? null);
+  // Keep a valid selection as the cast grows/shrinks (e.g. after adding the first character).
+  React.useEffect(() => { if (!chars.some(x => x.id === selId)) setSelId(chars[0]?.id ?? null); }, [chars, selId]);
+  function onAdd() { const nc = addCharacter?.(); if (nc) setSelId(nc.id); }
+
+  if (!chars.length) {
+    return (
+      <div className="ww-bible">
+        <div className="ww-sheet-empty" style={{ margin: 'auto', maxWidth: 420 }}>
+          <div className="ww-pv-kicker" style={{ marginBottom: 12 }}>Characters</div>
+          <b>No characters yet</b>
+          <p>Build the cast for this series. Add a character, then write their appearance to feed Visual Dev.</p>
+          <button className="ww-btn primary" style={{ marginTop: 8 }} onClick={onAdd}>＋ Add character</button>
+        </div>
+      </div>
+    );
+  }
+
+  const sid = selId as string; // non-null here: the empty-cast case returned above
+  const c = chars.find(x => x.id === sid) as any;
+  const b = bible[sid] || {};
+  const appText = (appearance && appearance[sid] != null) ? appearance[sid] : (b.appearance || '');
   // Portrait comes from Visual Dev (the locked canonical), shown read-only here.
-  const portraitUrl = (id?: string) => assetUrl(links?.characterPortrait?.[id || selId]);
+  const portraitUrl = (id?: string) => assetUrl(links?.characterPortrait?.[id || sid]);
   const relOf = (id: string) => chars.find(x => x.id === id) as any;
 
   const avImg = portraitUrl();
@@ -71,6 +88,7 @@ function Bible({ onGoVisual, links, appearance, updateAppearance }: any) {
             </button>
           );
         })}
+        <button className="ww-btn ghost" style={{ width: '100%', marginTop: 6 }} onClick={onAdd}>＋ Add character</button>
       </div>
       <div className="ww-bible-profile">
         <div className="ww-bp-hero">
@@ -128,10 +146,10 @@ function Bible({ onGoVisual, links, appearance, updateAppearance }: any) {
   );
 }
 
-function ArcBoard() {
-  const season = SEASONS.find(s => s.id === 's1');
-  const [eps, setEps] = React.useState(() => season!.episodes.map((e: any) => ({ id: e.id, n: e.n, title: e.title })));
-  const [arcs, setArcs] = React.useState(() => ARCS.map(a => ({ id: a.id, label: a.label, desc: a.desc, hue: a.hue, beats: { ...a.beats } })));
+function ArcBoard({ seasons, arcs: arcsSeed }: any) {
+  const season = (seasons || []).find((s: any) => s.id === 's1') || (seasons || [])[0];
+  const [eps, setEps] = React.useState<any[]>(() => (season?.episodes || []).map((e: any) => ({ id: e.id, n: e.n, title: e.title })));
+  const [arcs, setArcs] = React.useState<any[]>(() => (arcsSeed || []).map((a: any) => ({ id: a.id, label: a.label, desc: a.desc, hue: a.hue, beats: { ...a.beats } })));
   const [edit, setEdit] = React.useState<any>(null);
   const isEd = (kind: string, arcId: string | undefined, epId: string | undefined) => edit && edit.kind === kind && edit.arcId === arcId && edit.epId === epId;
   const cols = { gridTemplateColumns: `200px repeat(${eps.length}, minmax(134px, 1fr))` };
@@ -148,7 +166,7 @@ function ArcBoard() {
 
   return (
     <div className="ww-arcboard">
-      <div className="ww-pv-kicker">Season 1 · Counting Heads</div>
+      <div className="ww-pv-kicker">{season ? `Season ${season.n} · ${season.title}` : 'Seasons'}</div>
       <p className="ww-arcboard-intro"><b>Click any cell, throughline label, or episode title to edit it.</b> Read down a column for one episode, across a row for one arc — use the buttons to extend the season.</p>
       <div className="ww-arc-toolbar">
         <button className="ww-arc-add" onClick={addEpisode}>＋ Episode</button>
@@ -285,10 +303,10 @@ function BeatSheet({ panels, setPanels, episode }: any) {
 const SCRIPT_SCENES = ['dusk_skyline', 'street_phone', 'lanternwrights', 'night_lockdown', 'lantern_hub', 'logbook', 'mosquito', 'tunnels', 'echo_call', 'locked_hatch', 'rescue', 'aftermath'];
 const SCRIPT_BEATS = ['Establishing', 'Cold open', 'Worldbuild', 'Turn', 'Inciting', 'Discovery', 'Escalation', 'Crisis', 'Lifeline', 'Silence', 'Rescue', 'Resolution', 'Draft'];
 
-function ScriptEditor({ panels, setPanels, episode }: any) {
+function ScriptEditor({ panels, setPanels, episode, characters }: any) {
   const beats = storyPanels(panels);
   const upd = (id: string, patch: any) => setPanels(panels.map((p: any) => p.id === id ? { ...p, ...patch } : p));
-  const SPEAKERS = [...CHARACTERS.map((c: any) => c.name.toUpperCase()), 'NARRATOR'];
+  const SPEAKERS = [...(characters || []).map((c: any) => c.name.toUpperCase()), 'NARRATOR'];
   const DELIVERY = ['Spoken', 'Shouted', 'Whispered', 'Thought', 'Voice-over', 'Off-screen', 'Sung'];
 
   function mkPanel() { return { id: 'p' + Math.random().toString(36).slice(2, 6), n: 0, slug: 'NEW PANEL', scene: 'tunnels', beat: 'Draft', dur: '3.0s', caption: '', layers: [{ name: 'Background', depth: 0.2 }], fx: [mkFx('reveal')] }; }

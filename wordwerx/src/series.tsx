@@ -1,6 +1,5 @@
 import React from 'react';
 import { cx } from './ui';
-import { CHARACTERS } from './data';
 import { Scene } from './scenes';
 
 const GENRES = ['Sci-fi mystery', 'Folk-horror', 'Neon-noir', 'Cozy mystery', 'Solarpunk', 'Fantasy', 'Slice of life'];
@@ -18,7 +17,7 @@ function statusHue(s: string) {
   return ({ 'In production': 285, 'Drafting': 175, 'Visual dev': 330, 'Outlining': 60 } as any)[s] || 280;
 }
 
-export function Series({ series, setSeries, activeId, setActive, onOpen, flash }: any) {
+export function Series({ series, setSeries, activeId, setActive, onOpen, characters, flash }: any) {
   const [cfgId, setCfgId] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(false);
   const cfg = series.find((s: any) => s.id === cfgId);
@@ -35,6 +34,9 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, flash }
     setSeries((s: any[]) => [ns, ...s]);
     setCreating(false);
     flash('"' + ns.title + '" created · ' + ns.genre);
+    // Make the new (blank) series active and drop into its Narrative workspace.
+    setActive(ns.id);
+    onOpen(ns);
   }
 
   return (
@@ -83,7 +85,7 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, flash }
       </div>
 
       {creating && <NewSeriesModal onClose={() => setCreating(false)} onCreate={createSeries} />}
-      {cfg && <SeriesDrawer s={cfg} onClose={() => setCfgId(null)} flash={flash} />}
+      {cfg && <SeriesDrawer s={cfg} cast={cfg.id === activeId ? (characters || []) : []} onClose={() => setCfgId(null)} flash={flash} />}
     </div>
   );
 }
@@ -161,9 +163,7 @@ function NewSeriesModal({ onClose, onCreate }: any) {
   );
 }
 
-function SeriesDrawer({ s, onClose, flash }: any) {
-  const isEcho = s.id === 'echo';
-  const cast = isEcho ? CHARACTERS : [];
+function SeriesDrawer({ s, onClose, flash, cast = [] }: any) {
   const [pal, setPal] = React.useState(s.palette);
   const ROLES = ['Shadow', 'Midtone', 'Key light', 'Accent', 'Tint', 'Tone'];
   const setColor = (i: number, v: string) => setPal((p: string[]) => p.map((c, j) => j === i ? v : c));

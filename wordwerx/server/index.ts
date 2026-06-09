@@ -56,20 +56,23 @@ app.delete('/api/assets/:id', wrap(async (req, res) => {
 }));
 
 // --- Persisted app state + links (hydration source of truth) -----------------
-app.get('/api/state', wrap(async (_req, res) => { res.json(await getState()); }));
+// State + links are namespaced per series via ?series=<id> (defaults to 'echo').
+const seriesOf = (req: any): string => (typeof req.query.series === 'string' && req.query.series) || 'echo';
+
+app.get('/api/state', wrap(async (req, res) => { res.json(await getState(seriesOf(req))); }));
 
 app.patch('/api/state', wrap(async (req, res) => {
-  await patchState(req.body || {});
+  await patchState(seriesOf(req), req.body || {});
   res.json({ ok: true });
 }));
 
-// Set one link entry, e.g. POST /api/links/characterLora { key, value }.
+// Set one link entry, e.g. POST /api/links/characterLora?series=echo { key, value }.
 app.post('/api/links/:category', wrap(async (req, res) => {
   const { category } = req.params;
   if (!isLinkKey(category)) return res.status(400).json({ error: 'unknown link category' });
   const { key, value } = req.body || {};
   if (!key) return res.status(400).json({ error: 'key is required' });
-  await setLink(category, key, value);
+  await setLink(seriesOf(req), category, key, value);
   res.json({ ok: true });
 }));
 

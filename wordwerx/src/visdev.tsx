@@ -1,6 +1,5 @@
 import React from 'react';
 import { cx } from './ui';
-import { VISDEV, BIBLE } from './world';
 import { Scene } from './scenes';
 import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import { generate, imageSrc } from './services/runpod';
@@ -30,15 +29,42 @@ function Thumb({ url, scene, style, onSelect }: { url?: string; scene?: string; 
   return <Scene kind={scene || 'tunnels'} />;
 }
 
-export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, links, appearance, updateLink, visdevExtra, persistVisdev, hydrated }: any) {
+export function VisualDev({ tab, setTab, preselect, visdevSeed, bible, characters, flash: flashProp, online, links, appearance, updateLink, visdevExtra, persistVisdev, hydrated }: any) {
   const [subjects, setSubjects] = React.useState(() =>
-    (VISDEV || []).map((s: any) => ({ ...s, variants: s.variants.map((v: any) => ({ ...v })), history: [...s.history], sheetImgs: { poses: {}, expressions: {} } }))
+    (visdevSeed || []).map((s: any) => ({ ...s, variants: s.variants.map((v: any) => ({ ...v })), history: [...s.history], sheetImgs: { poses: {}, expressions: {} } }))
   );
-  const [selId, setSelId] = React.useState<string | null>(preselect || (VISDEV?.[0]?.id ?? null));
+  const [selId, setSelId] = React.useState<string | null>(preselect || (visdevSeed?.[0]?.id ?? null));
   const [localToast, setLocalToast] = React.useState<string | null>(null);
   const didHydrate = React.useRef(false);
 
-  React.useEffect(() => { if (preselect) setSelId(preselect); }, [preselect]);
+  // Build a Visual Dev subject from a Narrative character (used by the "Develop in
+  // Visual Dev" deep-link and the Add-subject picker so a blank series can start dev).
+  function mkSubjectFromChar(ch: any) {
+    return {
+      id: ch.id, subject: ch.name, kind: 'Character', scene: 'tunnels', hue: ch.tint ?? 200,
+      brief: ch.desc || '', locked: null, variants: [],
+      sheet: { poses: ['Front', '3/4', 'Profile', 'Reaching'], expressions: ['Neutral', 'Curious', 'Alarmed', 'Resolved'], palette: [] },
+      history: [], sheetImgs: { poses: {}, expressions: {} },
+    };
+  }
+  function addSubject(ch?: any) {
+    const subj = ch ? mkSubjectFromChar(ch)
+      : { id: 'subj' + Math.random().toString(36).slice(2, 6), subject: 'New subject', kind: 'Character', scene: 'tunnels', hue: 200, brief: '', locked: null, variants: [], sheet: { poses: ['Front', '3/4', 'Profile'], expressions: ['Neutral', 'Curious', 'Alarmed', 'Resolved'], palette: [] }, history: [], sheetImgs: { poses: {}, expressions: {} } };
+    setSubjects((prev: any[]) => prev.some(s => s.id === subj.id) ? prev : [...prev, subj]);
+    setSelId(subj.id);
+  }
+
+  // Deep-link from Narrative: select the matching subject, auto-creating it from the
+  // character if this series hasn't started its visual dev yet.
+  React.useEffect(() => {
+    if (!preselect) return;
+    setSubjects((prev: any[]) => {
+      if (prev.some(s => s.id === preselect)) return prev;
+      const ch = (characters || []).find((c: any) => c.id === preselect);
+      return ch ? [...prev, mkSubjectFromChar(ch)] : prev;
+    });
+    setSelId(preselect);
+  }, [preselect]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (didHydrate.current) return;
     if (hydrated) { if (visdevExtra?.subjects) setSubjects(visdevExtra.subjects); didHydrate.current = true; }
@@ -124,15 +150,19 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
           ? <Locations online={online} flash={flash} links={links} updateLink={updateLink} />
           : (
             <div className="ww-proto">
-              <SubjectSidebar subjects={subjects} selId={selId} setSelId={setSelId} />
+              <SubjectSidebar subjects={subjects} selId={selId} setSelId={setSelId} onAdd={() => addSubject()} />
               <div className="ww-proto-main">
                 {!sel ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                    <div className="ww-sheet-empty"><b>Select a subject</b><p>Pick a character, location or prop from the sidebar.</p></div>
+                    <div className="ww-sheet-empty">
+                      <b>{subjects.length ? 'Select a subject' : 'No subjects yet'}</b>
+                      <p>{subjects.length ? 'Pick a character, location or prop from the sidebar.' : 'Add a subject here, or open a character in Narrative and click “Develop in Visual Dev”.'}</p>
+                      {!subjects.length && <button className="ww-btn primary" style={{ marginTop: 8 }} onClick={() => addSubject()}>＋ Add subject</button>}
+                    </div>
                   </div>
                 ) : tab === 'board'
                   ? <VariantInspector subj={sel} online={online} charLora={links?.characterLora?.[sel.id]?.loraName}
-                      appearance={appearance} flash={flash} onLock={lockVariant} onSetState={setVariantState}
+                      appearance={appearance} bible={bible} flash={flash} onLock={lockVariant} onSetState={setVariantState}
                       onDelete={deleteVariant} onVariant={addVariant} isCharacter={isCharacter(sel)}
                       onField={(f: string, v: any) => patchSubject(sel.id, (s: any) => ({ ...s, [f]: v }))} />
                   : <ModelSheet subj={sel} online={online} onGenSheet={genSheet} onField={(f: string, v: any) => patchSubject(sel.id, (s: any) => ({ ...s, [f]: v }))} />}
@@ -145,7 +175,7 @@ export function VisualDev({ tab, setTab, preselect, flash: flashProp, online, li
   );
 }
 
-function SubjectSidebar({ subjects, selId, setSelId }: any) {
+function SubjectSidebar({ subjects, selId, setSelId, onAdd }: any) {
   return (
     <div className="ww-proto-subjects">
       <div className="ww-insp-sub" style={{ padding: '0 6px 10px' }}>Subjects · {subjects.length}</div>
@@ -156,13 +186,14 @@ function SubjectSidebar({ subjects, selId, setSelId }: any) {
           <div className={cx('ww-proto-lockdot', s.locked ? 'locked' : 'open')} />
         </button>
       ))}
+      {onAdd && <button className="ww-btn ghost" style={{ width: '100%', marginTop: 6 }} onClick={onAdd}>＋ Add subject</button>}
     </div>
   );
 }
 
-function VariantInspector({ subj, online, charLora, appearance, flash, onLock, onSetState, onDelete, onVariant, isCharacter, onField }: any) {
+function VariantInspector({ subj, online, charLora, appearance, bible, flash, onLock, onSetState, onDelete, onVariant, isCharacter, onField }: any) {
   const [pending, setPending] = React.useState(0);
-  const appear = (appearance && appearance[subj.id]) || (BIBLE || {})[subj.id]?.appearance || '';
+  const appear = (appearance && appearance[subj.id]) || (bible || {})[subj.id]?.appearance || '';
   const defaultPrompt = appear ? `${appear} — ${subj.brief}` : subj.brief;
   return (
     <div>

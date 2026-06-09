@@ -18,34 +18,69 @@ const DB_PATH = join(STORE_DIR, 'db.json');
 mkdirSync(ASSETS_DIR, { recursive: true });
 
 export interface AssetMeta { id: string; file: string; mime: string; origin?: unknown; createdAt: number }
+export interface Links {
+  characterLora: Record<string, { loraName: string; triggerWord?: string }>;
+  characterPortrait: Record<string, string>;     // charId -> assetId
+  visdevVariant: Record<string, string>;         // "subj:v" -> assetId
+  visdevCanonical: Record<string, { v: string; assetId: string }>;
+  panelImage: Record<string, string>;            // panelId -> assetId
+  layerImage: Record<string, string>;            // "panelId:layerIdx" -> assetId
+  locationAngles: Record<string, string[]>;      // subj -> assetId[]
+}
+export interface SeriesState { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> }
+export interface SeriesEntry { links: Links; state: SeriesState }
 export interface Db {
+  // Assets are content-addressed blobs shared across series (links point into them).
   assets: Record<string, AssetMeta>;
-  links: {
-    characterLora: Record<string, { loraName: string; triggerWord?: string }>;
-    characterPortrait: Record<string, string>;     // charId -> assetId
-    visdevVariant: Record<string, string>;         // "subj:v" -> assetId
-    visdevCanonical: Record<string, { v: string; assetId: string }>;
-    panelImage: Record<string, string>;            // panelId -> assetId
-    layerImage: Record<string, string>;            // "panelId:layerIdx" -> assetId
-    locationAngles: Record<string, string[]>;      // subj -> assetId[]
-  };
-  state: { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> };
+  // Everything else is namespaced by series id so a new series starts blank.
+  series: Record<string, SeriesEntry>;
 }
 
-const EMPTY: Db = {
-  assets: {},
-  links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, layerImage: {}, locationAngles: {} },
-  state: { library: [], appearance: {}, visdevExtra: {} },
-};
+function emptySeries(): SeriesEntry {
+  return {
+    links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, layerImage: {}, locationAngles: {} },
+    state: { library: [], appearance: {}, visdevExtra: {} },
+  };
+}
+
+const EMPTY: Db = { assets: {}, series: {} };
 
 let cache: Db | null = null;
 let writing: Promise<void> = Promise.resolve();
 
+// Normalize a raw db blob into the current per-series shape, migrating the old
+// flat { assets, links, state } layout (single global series) into series.echo.
+function normalizeDb(raw: any): Db {
+  const db: Db = { assets: raw?.assets || {}, series: {} };
+  if (raw && (raw.links || raw.state) && !raw.series) {
+    // Legacy flat shape — everything belonged to the seed series.
+    db.series.echo = mergeSeries(raw.links, raw.state);
+  } else {
+    for (const id of Object.keys(raw?.series || {})) {
+      db.series[id] = mergeSeries(raw.series[id]?.links, raw.series[id]?.state);
+    }
+  }
+  return db;
+}
+
+// Fill in any missing link categories / state fields on a series entry.
+function mergeSeries(links: any, state: any): SeriesEntry {
+  const base = emptySeries();
+  return {
+    links: { ...base.links, ...(links || {}) },
+    state: { ...base.state, ...(state || {}) },
+  };
+}
+
+// Get a series partition, creating an empty one on first access.
+function seriesOf(db: Db, seriesId: string): SeriesEntry {
+  return (db.series[seriesId] ||= emptySeries());
+}
+
 async function readDb(): Promise<Db> {
   if (cache) return cache;
   try {
-    const raw = JSON.parse(await readFile(DB_PATH, 'utf8'));
-    cache = { ...EMPTY, ...raw, links: { ...EMPTY.links, ...(raw.links || {}) }, state: { ...EMPTY.state, ...(raw.state || {}) } };
+    cache = normalizeDb(JSON.parse(await readFile(DB_PATH, 'utf8')));
   } catch { cache = structuredClone(EMPTY); }
   return cache!;
 }
@@ -103,16 +138,18 @@ export async function deleteAsset(id: string): Promise<void> {
   await writeDb(db);
 }
 
-export async function getState(): Promise<{ links: Db['links']; state: Db['state'] }> {
+export async function getState(seriesId: string): Promise<{ links: Links; state: SeriesState }> {
   const db = await readDb();
-  return { links: db.links, state: db.state };
+  const s = seriesOf(db, seriesId);
+  return { links: s.links, state: s.state };
 }
 
-/** Shallow-merge a {links?, state?} patch (one level into each category). */
-export async function patchState(patch: { links?: Partial<Db['links']>; state?: Partial<Db['state']> }): Promise<void> {
+/** Shallow-merge a {links?, state?} patch (one level into each category) for one series. */
+export async function patchState(seriesId: string, patch: { links?: Partial<Links>; state?: Partial<SeriesState> }): Promise<void> {
   const db = await readDb();
-  if (patch.state) for (const k of Object.keys(patch.state)) (db.state as any)[k] = (patch.state as any)[k];
-  if (patch.links) for (const k of Object.keys(patch.links)) (db.links as any)[k] = { ...(db.links as any)[k], ...(patch.links as any)[k] };
+  const s = seriesOf(db, seriesId);
+  if (patch.state) for (const k of Object.keys(patch.state)) (s.state as any)[k] = (patch.state as any)[k];
+  if (patch.links) for (const k of Object.keys(patch.links)) (s.links as any)[k] = { ...(s.links as any)[k], ...(patch.links as any)[k] };
   await writeDb(db);
 }
 
@@ -120,10 +157,10 @@ const LINK_KEYS = ['characterLora', 'characterPortrait', 'visdevVariant', 'visde
 export type LinkKey = typeof LINK_KEYS[number];
 export function isLinkKey(k: string): k is LinkKey { return (LINK_KEYS as readonly string[]).includes(k); }
 
-/** Set one entry in a link map, e.g. setLink('characterLora','echo',{loraName,triggerWord}). */
-export async function setLink(category: LinkKey, key: string, value: unknown): Promise<void> {
+/** Set one entry in a series' link map, e.g. setLink('echo','characterLora','echo',{loraName,triggerWord}). */
+export async function setLink(seriesId: string, category: LinkKey, key: string, value: unknown): Promise<void> {
   const db = await readDb();
-  (db.links as any)[category][key] = value;
+  (seriesOf(db, seriesId).links as any)[category][key] = value;
   await writeDb(db);
 }
 

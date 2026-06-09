@@ -1,11 +1,10 @@
 import React from 'react';
 import { cx } from './ui';
 import { FxChip } from './ui';
-import { EPISODE } from './data';
 import { Scene } from './scenes';
 import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
-export function Preview({ panels }: any) {
+export function Preview({ panels, episode }: any) {
   const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, holdingId, restart } = usePreviewEngine(panels);
   const phoneRef = React.useRef<HTMLDivElement>(null);
 
@@ -30,12 +29,24 @@ export function Preview({ panels }: any) {
 
   const cur = panels[active] || panels[0];
 
+  if (!cur) {
+    return (
+      <div className="ww-preview">
+        <div className="ww-sheet-empty" style={{ margin: 'auto', maxWidth: 420 }}>
+          <div className="ww-pv-kicker" style={{ marginBottom: 12 }}>Read mode</div>
+          <b>Nothing to preview yet</b>
+          <p>Add panels in Narrative → Storyboard or Production → Compose, then come back to read the episode.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ww-preview">
       <div className="ww-preview-sidecopy">
         <div className="ww-pv-kicker">Read mode · live</div>
-        <h2>{EPISODE.series}</h2>
-        <div className="ww-pv-ep">{EPISODE.number} — {EPISODE.title}</div>
+        <h2>{episode.series}</h2>
+        <div className="ww-pv-ep">{episode.number} — {episode.title}</div>
         <p className="ww-pv-now">Now reading</p>
         <div className="ww-pv-beat"><b>{String(cur.n).padStart(2, '0')}</b> {cur.slug}<span>{cur.beat}</span></div>
         <div className="ww-pv-active-fx">
@@ -80,7 +91,7 @@ export function Preview({ panels }: any) {
               </section>
             );
           })}
-          <section className="ww-rpanel ww-rend"><div>"{EPISODE.title}"<span>End of Episode 01</span></div></section>
+          <section className="ww-rpanel ww-rend"><div>"{episode.title}"<span>End of Episode 01</span></div></section>
         </div>
         <div key={flashKey} className={cx('ww-flash', hasFx(cur, 'impact') && 'go')} style={{ '--flash': flashColor(cur) } as any} />
         <div className="ww-phone-rail"><div className="ww-phone-rail-fill" style={{ height: (progress * 100) + '%' }} /></div>

@@ -72,6 +72,27 @@ export function Compose({ panels, setPanels, selId, setSelId, canvasModel, fxUI,
 
   const FxUI = ({ inspector: FxInspector, tracks: FxTracks, stage: FxStage } as any)[fxUI] || FxInspector;
 
+  // Empty state for a series with no panels yet (e.g. a brand-new series).
+  if (!panel) {
+    return (
+      <div className="ww-compose">
+        <div className="ww-seqrail">
+          <div className="ww-rail-head">Panels <span>0</span></div>
+          <div className="ww-seqlist" />
+          <button className="ww-addpanel" onClick={addPanel}>＋ New panel</button>
+        </div>
+        <div className={cx('ww-canvas', 'is-' + canvasModel)}>
+          <div className="ww-sheet-empty" style={{ margin: 'auto', maxWidth: 420 }}>
+            <div className="ww-pv-kicker" style={{ marginBottom: 12 }}>Compose</div>
+            <b>No panels yet</b>
+            <p>Add your first panel to start composing the episode — or build the storyboard in Narrative → Storyboard.</p>
+            <button className="ww-btn primary" style={{ marginTop: 8 }} onClick={addPanel}>＋ New panel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ww-compose">
       <div className="ww-seqrail">

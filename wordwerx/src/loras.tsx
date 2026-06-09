@@ -1,13 +1,12 @@
 import React from 'react';
 import { cx } from './ui';
-import { CHARACTERS } from './data';
 import { listLoras, uploadLora, trainLora, generate, pollJob, imageSrc, type Lora } from './services/runpod';
 import { txt2imgSDXL, txt2imgFlux } from './workflows';
 
 // LoRA Manager — list, upload existing .safetensors, and train a new LoRA from
 // a character's image set. Trained/uploaded LoRAs land on the network volume
 // and become selectable everywhere generation happens.
-export function LoraManager({ flash, updateLink }: { flash?: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void }) {
+export function LoraManager({ flash, updateLink, characters }: { flash?: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void; characters?: any[] }) {
   const [loras, setLoras] = React.useState<Lora[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
@@ -60,7 +59,7 @@ export function LoraManager({ flash, updateLink }: { flash?: (m: string) => void
         </div>
       )}
 
-      {tab === 'train' && <TrainPanel updateLink={updateLink} onDone={(m) => { note(m); refresh(); setTab('library'); }} onError={setErr} />}
+      {tab === 'train' && <TrainPanel characters={characters} updateLink={updateLink} onDone={(m) => { note(m); refresh(); setTab('library'); }} onError={setErr} />}
     </div>
   );
 }
@@ -75,9 +74,10 @@ function UploadButton({ onPick }: { onPick: (f: File) => void }) {
   );
 }
 
-function TrainPanel({ onDone, onError, updateLink }: { onDone: (m: string) => void; onError: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void }) {
+function TrainPanel({ onDone, onError, updateLink, characters }: { onDone: (m: string) => void; onError: (m: string) => void; updateLink?: (cat: any, key: string, value: unknown) => void; characters?: any[] }) {
+  const cast = characters || [];
   const [name, setName] = React.useState('');
-  const [character, setCharacter] = React.useState(CHARACTERS[0]?.id || '');
+  const [character, setCharacter] = React.useState(cast[0]?.id || '');
   const [trigger, setTrigger] = React.useState('');
   const [steps, setSteps] = React.useState(1500);
   const [rank, setRank] = React.useState(32);
@@ -143,9 +143,11 @@ function TrainPanel({ onDone, onError, updateLink }: { onDone: (m: string) => vo
     <div style={{ marginTop: 16, maxWidth: 640, display: 'grid', gap: 12 }}>
       <Field label="LoRA name"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={name} onChange={e => setName(e.target.value)} placeholder="echo_v1" /></Field>
       <Field label="Character (for the roster link)">
-        <select className="ww-gen-prompt" style={{ minHeight: 0, height: 36 }} value={character} onChange={e => setCharacter(e.target.value)}>
-          {CHARACTERS.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        {cast.length ? (
+          <select className="ww-gen-prompt" style={{ minHeight: 0, height: 36 }} value={character} onChange={e => setCharacter(e.target.value)}>
+            {cast.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', margin: 0 }}>No characters in this series yet — add one in Narrative to link a trained LoRA.</p>}
       </Field>
       <Field label="Trigger word"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={trigger} onChange={e => setTrigger(e.target.value)} placeholder={name || 'echo'} /></Field>
       <div style={{ display: 'flex', gap: 12 }}>

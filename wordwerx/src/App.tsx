@@ -1,7 +1,8 @@
 import React from 'react';
 import { cx } from './ui';
-import { PANELS, LIBRARY, EPISODE, mkFx } from './data';
+import { mkFx } from './data';
 import { SERIES } from './world';
+import { getSeriesContent } from './series-data';
 import { Scene } from './scenes';
 import { Copilot } from './copilot';
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle } from './tweaks-panel';
@@ -49,9 +50,12 @@ export default function App() {
   const [series, setSeries] = React.useState(() => SERIES);
   const [activeSeries, setActiveSeries] = React.useState('echo');
   const [seriesMenu, setSeriesMenu] = React.useState(false);
-  const [panels, setPanels] = React.useState(() => PANELS);
-  const [library, setLibrary] = React.useState(() => LIBRARY);
-  const [selId, setSelId] = React.useState(PANELS[5].id);
+  // Editable content is namespaced per series, lazily seeded from the registry
+  // (Echo gets its full seed; every other series starts blank).
+  const [panelsBySeries, setPanelsBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').panels }));
+  const [libraryBySeries, setLibraryBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').library }));
+  const [charactersBySeries, setCharactersBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').characters }));
+  const [selId, setSelId] = React.useState<string | null>(() => getSeriesContent('echo').panels[5]?.id ?? null);
   const [copilot, setCopilot] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const [visualSelId, setVisualSelId] = React.useState<string | null>(null);
@@ -63,42 +67,72 @@ export default function App() {
   const [visdevExtra, setVisdevExtra] = React.useState<any>({});
   const [hydrated, setHydrated] = React.useState(false);
 
-  // Hydrate persisted state + links from the local store on load.
+  // Resolve the active series' content + editable arrays (seeded from the registry).
+  const activeObj = series.find(s => s.id === activeSeries) || series[0];
+  const content = React.useMemo(() => getSeriesContent(activeSeries, activeObj), [activeSeries, activeObj]);
+  const panels = panelsBySeries[activeSeries] ?? content.panels;
+  const library = libraryBySeries[activeSeries] ?? content.library;
+  const characters = charactersBySeries[activeSeries] ?? content.characters;
+
+  // Series-scoped setters that accept a value or an updater fn, writing back to
+  // the active series' slot (seeding from the registry on first edit).
+  const setPanels = (u: any) => setPanelsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.panels) : u }));
+  const setLibrary = (u: any) => setLibraryBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.library) : u }));
+  const setCharacters = (u: any) => setCharactersBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.characters) : u }));
+
+  // Append a blank character to the active series' cast; returns it so the caller can select it.
+  function addCharacter() {
+    const c = { id: 'ch' + Math.random().toString(36).slice(2, 6), name: 'New character', role: 'Role · They', tint: Math.floor(Math.random() * 360), desc: '', state: 'Draft' };
+    setCharacters((cs: any[]) => [...cs, c]);
+    return c;
+  }
+
+  // Hydrate persisted state + links for the active series (re-runs on series switch).
   React.useEffect(() => {
-    getState()
+    let cancelled = false;
+    setHydrated(false);
+    getState(activeSeries)
       .then(({ links, state }) => {
+        if (cancelled) return;
         setLinks(links);
         setAppearance(state.appearance || {});
         setVisdevExtra(state.visdevExtra || {});
-        if (state.library && state.library.length) setLibrary(state.library);
+        if (state.library && state.library.length) setLibraryBySeries(m => ({ ...m, [activeSeries]: state.library }));
       })
       .catch(() => {})
-      .finally(() => setHydrated(true));
-  }, []);
+      .finally(() => { if (!cancelled) setHydrated(true); });
+    return () => { cancelled = true; };
+  }, [activeSeries]);
+
+  // Keep the Compose selection valid when the active series (and its panels) change.
+  React.useEffect(() => {
+    const ps = panelsBySeries[activeSeries] ?? content.panels;
+    setSelId(prev => (ps.some((p: any) => p.id === prev) ? prev : (ps[5]?.id ?? ps[0]?.id ?? null)));
+  }, [activeSeries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist a Visual Dev snapshot (variants + locks + image links) for offline reload.
   function persistVisdev(snapshot: any) {
     setVisdevExtra(snapshot);
-    patchState({ state: { visdevExtra: snapshot } }).catch(() => {});
+    patchState(activeSeries, { state: { visdevExtra: snapshot } }).catch(() => {});
   }
 
-  // Persist the library (seed + generated) after hydration, debounced.
+  // Persist the active series' library (seed + generated) after hydration, debounced.
   React.useEffect(() => {
     if (!hydrated) return;
-    const id = setTimeout(() => { patchState({ state: { library } }).catch(() => {}); }, 600);
+    const id = setTimeout(() => { patchState(activeSeries, { state: { library } }).catch(() => {}); }, 600);
     return () => clearTimeout(id);
-  }, [library, hydrated]);
+  }, [library, hydrated, activeSeries]);
 
-  // Persist + reflect a link change (character LoRA, canonical, portrait, …).
+  // Persist + reflect a link change (character LoRA, canonical, portrait, …) for the active series.
   function updateLink(category: keyof StoreLinks, key: string, value: unknown) {
     setLinks(l => (l ? { ...l, [category]: { ...(l as any)[category], [key]: value } } : l));
-    apiSetLink(category, key, value).catch(() => {});
+    apiSetLink(activeSeries, category, key, value).catch(() => {});
   }
-  // Persist + reflect a character's appearance text.
+  // Persist + reflect a character's appearance text for the active series.
   function updateAppearance(charId: string, text: string) {
     setAppearance(a => {
       const next = { ...a, [charId]: text };
-      patchState({ state: { appearance: next } }).catch(() => {});
+      patchState(activeSeries, { state: { appearance: next } }).catch(() => {});
       return next;
     });
   }
@@ -113,17 +147,16 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  const activeObj = series.find(s => s.id === activeSeries) || series[0];
-  const isEcho = activeSeries === 'echo';
   const setSub = (wsId: string, v: string) => setSubs(s => ({ ...s, [wsId]: v }));
 
   function flash(msg: string) { setToast(msg); clearTimeout(__wwT); __wwT = setTimeout(() => setToast(null), 2600); }
   function nav(item: any) { setWs(item.id); if (item.children && !(open as any)[item.id]) setOpen(o => ({ ...o, [item.id]: true })); }
-  function openSeries(s: any) { setActiveSeries(s.id); if (s.id === 'echo') setWs('narrative'); }
+  // Opening any series now lands in Narrative (every workspace works for every series).
+  function openSeries(s: any) { setActiveSeries(s.id); setWs('narrative'); setSub('narrative', 'cast'); }
 
   function onApply(action: any) {
     if (action.kind === 'pacing') {
-      setPanels(ps => ps.map(p => ['p9', 'p10'].includes(p.id) && !p.fx.some((f: any) => f.type === 'pacing') ?
+      setPanels((ps: any[]) => ps.map((p: any) => ['p9', 'p10'].includes(p.id) && !p.fx.some((f: any) => f.type === 'pacing') ?
         { ...p, fx: [...p.fx, mkFx('pacing', { params: { Mode: p.id === 'p9' ? 'Scroll-lock' : 'Hold beat', Length: 2.2 } })] } : p));
       flash('Pacing applied to the crisis sequence');
     } else if (action.kind === 'generate') { flash('Queued 8 character plates'); setWs('production'); setSub('production', 'library'); }
@@ -226,21 +259,20 @@ export default function App() {
       <div className="ww-main">
         <div className={cx('ww-stagewrap', showCop && 'has-cop')}>
           <main className="ww-stage">
-            {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} flash={flash} />}
+            {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
-            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager flash={flash} updateLink={updateLink} />}
-            {ws !== 'series' && !isEcho && !(ws === 'visual' && (subs as any).visual === 'loras') && <PlaceholderWS s={activeObj} onManage={() => setWs('series')} />}
-            {ws === 'narrative' && isEcho && <Narrative panels={panels} setPanels={setPanels} episode={EPISODE} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
-            {ws === 'visual' && isEcho && (subs as any).visual !== 'loras' && <VisualDev tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
-            {ws === 'production' && isEcho && (
-              (subs as any).production === 'story' ? <Story panels={panels} /> :
-              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} /> :
-              (subs as any).production === 'compose' ? <Compose panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
-              (subs as any).production === 'preview' ? <Preview panels={panels} /> :
-              <Publish panels={panels} library={library} links={links} updateLink={updateLink} flash={flash} />
+            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} characters={characters} flash={flash} updateLink={updateLink} />}
+            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} seasons={content.seasons} arcs={content.arcs} bible={content.bible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={content.bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
+            {ws === 'production' && (
+              (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={content.episode} /> :
+              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
+              (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
+              (subs as any).production === 'preview' ? <Preview panels={panels} episode={content.episode} /> :
+              <Publish panels={panels} library={library} links={links} episode={content.episode} characters={characters} updateLink={updateLink} flash={flash} />
             )}
           </main>
-          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={EPISODE} />}
+          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={content.episode} />}
         </div>
       </div>
 
@@ -259,19 +291,5 @@ export default function App() {
     </div>
     <Lightbox url={ui.image} onClose={ui.closeImage} />
     </UIContext.Provider>
-  );
-}
-
-function PlaceholderWS({ s, onManage }: any) {
-  return (
-    <div className="ww-sheet">
-      <div className="ww-sheet-empty" style={{ paddingTop: 80 }}>
-        <div className="ww-pv-kicker" style={{ marginBottom: 12 }}>{s.genre}</div>
-        <b>{s.title} is a placeholder series</b>
-        <p>In this prototype the full narrative, visual-development and production data lives with
-          <b style={{ color: 'var(--ink)' }}> Echo's Location</b>. Switch back to it from the series menu to explore the workbench in depth, or open the catalogue to configure {s.title}.</p>
-        <button className="ww-btn ghost" onClick={onManage}>← Back to all series</button>
-      </div>
-    </div>
   );
 }

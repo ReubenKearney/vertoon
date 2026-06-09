@@ -1,14 +1,14 @@
 import React from 'react';
 import { cx } from './ui';
 import { AssetThumb, StateDot } from './ui';
-import { CHARACTERS, EPISODE } from './data';
 import { Scene } from './scenes';
 import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import type { UseCase } from './workflows';
 import { assetUrl } from './services/store';
 import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
 
-export function Library({ library, setLibrary, onUseAsset, online, flash }: any) {
+export function Library({ library, setLibrary, onUseAsset, online, flash, characters }: any) {
+  const cast = characters || [];
   const [filter, setFilter] = React.useState('All');
   const [pending, setPending] = React.useState(0);
   const kinds = ['All', 'Background', 'Character', 'Prop', 'FX plate'];
@@ -44,9 +44,9 @@ export function Library({ library, setLibrary, onUseAsset, online, flash }: any)
         ))}
       </div>
       <div className="ww-cast">
-        <div className="ww-insp-sub">Cast plates · {CHARACTERS.length}</div>
+        <div className="ww-insp-sub">Cast plates · {cast.length}</div>
         <div className="ww-castrow">
-          {CHARACTERS.map((c: any) => (
+          {cast.map((c: any) => (
             <div key={c.id} className="ww-castcard">
               <div className="ww-castcard-art" style={{ background: `radial-gradient(80% 80% at 50% 30%, oklch(0.5 0.13 ${c.tint}), #0a0c12 80%)` }}>
                 <span className="ww-castcard-mono">{c.name.split(' ')[0]}</span>
@@ -60,8 +60,8 @@ export function Library({ library, setLibrary, onUseAsset, online, flash }: any)
   );
 }
 
-export function Story({ panels }: any) {
-  const e = EPISODE;
+export function Story({ panels, episode }: any) {
+  const e = episode;
   return (
     <div className="ww-story">
       <div className="ww-story-hero">
@@ -105,8 +105,10 @@ export function Story({ panels }: any) {
   );
 }
 
-export function Publish({ panels, links, flash }: any) {
+export function Publish({ panels, links, flash, episode }: any) {
   const story = (panels || []).filter((p: any) => p.scene !== 'parallax_demo');
+  // Filename-safe slug from the episode/series title for the export.
+  const slug = (episode?.series || episode?.title || 'episode').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-ep01';
   const panelImage: Record<string, string> = links?.panelImage || {};
   const layerImage: Record<string, string> = links?.layerImage || {};
   const [downscale, setDownscale] = React.useState(true);
@@ -119,8 +121,8 @@ export function Publish({ panels, links, flash }: any) {
     setBusy(true);
     try {
       const pp: PublishPanel[] = story.map((p: any, i: number) => ({ id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360, layers: p.layers?.length }));
-      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: EPISODE.title, series: EPISODE.series, panelImage, layerImage, downscale });
-      downloadHtml(html, `echos-location-ep01.html`);
+      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: episode.title, series: episode.series, panelImage, layerImage, downscale });
+      downloadHtml(html, `${slug}.html`);
       setResult({ bytes, withArt });
       flash?.(`Exported offline comic · ${(bytes / 1e6).toFixed(2)} MB`);
     } catch (e: any) { flash?.('Export failed: ' + e.message); }
@@ -131,7 +133,7 @@ export function Publish({ panels, links, flash }: any) {
     <div className="ww-publish">
       <div className="ww-pub-main">
         <div className="ww-pv-kicker">Publish</div>
-        <h2>Ship "{EPISODE.title}"</h2>
+        <h2>Ship "{episode.title}"</h2>
         <p className="ww-pub-sub">Export the episode as a single self-contained <b>.html</b> — every assigned image is inlined and the scroll-reveal is baked in, so it opens offline with no external requests.</p>
         <div className="ww-pub-stats">
           <div><b>{story.length}</b><span>panels</span></div>
@@ -143,7 +145,7 @@ export function Publish({ panels, links, flash }: any) {
         <button className={cx('ww-pub-go', busy && 'is-done')} disabled={busy} onClick={exportComic}>{busy ? 'Exporting…' : '⤓ Export offline comic (.html)'}</button>
         {result && (
           <div className="ww-pub-link">
-            <code>echos-location-ep01.html · {result.withArt}/{story.length} panels with art · {(result.bytes / 1e6).toFixed(2)} MB</code>
+            <code>{slug}.html · {result.withArt}/{story.length} panels with art · {(result.bytes / 1e6).toFixed(2)} MB</code>
           </div>
         )}
         <p className="ww-pub-sub" style={{ marginTop: 22, fontSize: 12 }}>Assign generated images to panels in <b>Production → Compose</b> (panel inspector → “Panel art”). {assigned}/{story.length} panels currently have art.</p>
@@ -151,7 +153,7 @@ export function Publish({ panels, links, flash }: any) {
       <div className="ww-pub-aside">
         <div className="ww-pub-poster">
           {assigned > 0 ? <img src={assetUrl(panelImage[story[0].id])} alt="" style={{ width: '100%', display: 'block' }} /> : <Scene kind="dusk_skyline" />}
-          <div className="ww-pub-poster-meta"><span>Episode 01</span><b>{EPISODE.title}</b><i>{EPISODE.series}</i></div>
+          <div className="ww-pub-poster-meta"><span>Episode 01</span><b>{episode.title}</b><i>{episode.series}</i></div>
         </div>
         <div className="ww-pub-share">
           <div className="ww-insp-sub">Offline-ready</div>

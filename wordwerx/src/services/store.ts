@@ -55,18 +55,20 @@ export function assetIdOf(idOrUrl?: string): string | undefined {
   return m ? m[1] : (idOrUrl.includes('/') ? undefined : idOrUrl);
 }
 
-export async function getState(): Promise<{ links: StoreLinks; state: StoreState }> {
-  return jsonOrThrow(await fetch('/api/state')) as Promise<{ links: StoreLinks; state: StoreState }>;
+// State + links are namespaced per series; pass the active series id through to
+// the companion server so a new series starts blank and doesn't share Echo's.
+export async function getState(seriesId: string): Promise<{ links: StoreLinks; state: StoreState }> {
+  return jsonOrThrow(await fetch(`/api/state?series=${encodeURIComponent(seriesId)}`)) as Promise<{ links: StoreLinks; state: StoreState }>;
 }
 
-export async function patchState(patch: { links?: Partial<StoreLinks>; state?: Partial<StoreState> }): Promise<void> {
-  await jsonOrThrow(await fetch('/api/state', {
+export async function patchState(seriesId: string, patch: { links?: Partial<StoreLinks>; state?: Partial<StoreState> }): Promise<void> {
+  await jsonOrThrow(await fetch(`/api/state?series=${encodeURIComponent(seriesId)}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
   }));
 }
 
-export async function setLink(category: keyof StoreLinks, key: string, value: unknown): Promise<void> {
-  await jsonOrThrow(await fetch(`/api/links/${category}`, {
+export async function setLink(seriesId: string, category: keyof StoreLinks, key: string, value: unknown): Promise<void> {
+  await jsonOrThrow(await fetch(`/api/links/${category}?series=${encodeURIComponent(seriesId)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }),
   }));
 }
