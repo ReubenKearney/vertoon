@@ -78,6 +78,31 @@ drawer (one-per-line textarea, same as the create modal).
 
 ---
 
+## ✅ Done — Episode from scratch, end-to-end with real generation — 2026-06-13
+Direct on `main`. The core product loop is now proven for a brand-new series with REAL image
+generation (16/16 automated checks, $0.02 RunPod spend): create series → add character + appearance
+→ Visual Dev: generate variant (SDXL) → lock canonical (portrait flows back to Narrative) → name the
+episode on the Seasons board → write panels + dialogue in Script → Library: generate scene art →
+Compose: assign art to panel layers → Publish → exported `.html` opened fresh from disk in a
+hard-offline browser (all network blocked): both panels render real base64 art, dialogue, scroll
+reveal, zero requests, zero errors.
+
+### Fix shipped with this pass
+- **Episode metadata follows the Seasons board** — `episode.title` was hardcoded `'Untitled episode'`
+  in `blankContent` with no way to change it, so every new-series export shipped untitled. App now
+  derives the episode from the first episode of the first season (no Echo regression — its seed
+  titles already matched).
+
+### Notes
+- `server/.env` must hold `RUNPOD_API_KEY` (see RUNPOD_SETUP.md). It is gitignored with no history —
+  **edit it in place, never recreate it**; a blank-secrets rewrite during an earlier session is how
+  the key went missing.
+- Known cosmetic gaps, not blockers: the Generate button is enabled even when the endpoint/key is
+  missing (`canGenerate` only checks reachability — errors surface at click time); the Publish poster
+  thumbnail only reads legacy `panelImage` links, so layer-assigned art doesn't preview there.
+
+---
+
 ## Next session
 
 ### Lint debt (carried over)

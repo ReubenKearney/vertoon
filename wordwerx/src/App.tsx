@@ -80,6 +80,13 @@ export default function App() {
   const bible = bibleBySeries[activeSeries] ?? content.bible;
   const seasons = seasonsBySeries[activeSeries] ?? content.seasons;
   const arcs = arcsBySeries[activeSeries] ?? content.arcs;
+  // Episode metadata follows the Seasons board: renaming the first episode there
+  // names what Script / Story / Preview / Publish are shipping.
+  const ep0Title = (seasons || [])[0]?.episodes?.[0]?.title;
+  const episode = React.useMemo(
+    () => (ep0Title ? { ...content.episode, title: ep0Title } : content.episode),
+    [content, ep0Title],
+  );
 
   // Series-scoped setters that accept a value or an updater fn, writing back to
   // the active series' slot (seeding from the registry on first edit).
@@ -317,17 +324,17 @@ export default function App() {
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
             {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} characters={characters} flash={flash} updateLink={updateLink} />}
-            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
             {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
-              (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={content.episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
+              (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
               (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
-              (subs as any).production === 'preview' ? <Preview panels={panels} episode={content.episode} /> :
-              <Publish panels={panels} library={library} links={links} episode={content.episode} characters={characters} updateLink={updateLink} flash={flash} />
+              (subs as any).production === 'preview' ? <Preview panels={panels} episode={episode} /> :
+              <Publish panels={panels} library={library} links={links} episode={episode} characters={characters} updateLink={updateLink} flash={flash} />
             )}
           </main>
-          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={content.episode} seed={activeSeries === 'echo'} />}
+          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={episode} seed={activeSeries === 'echo'} />}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 # WORDWERX — feature status
 
-Ground truth for the RunPod image-generation + UI integration. Updated 2026-06-12.
+Ground truth for the RunPod image-generation + UI integration. Updated 2026-06-13.
 
 ## Backend (RunPod)
 | Feature | Status |
@@ -33,6 +33,7 @@ Ground truth for the RunPod image-generation + UI integration. Updated 2026-06-1
 | Visual Dev — Locations (perspective) | ✅ |
 | Publish — assign panel art + export offline `.html` | ✅ |
 | Series — create from scratch; seasons/arc board + config drawer persisted per series | ✅ (verified 2026-06-12) |
+| Episode — from-scratch E2E: character → generated portrait → panel art → offline `.html` export | ✅ (verified 2026-06-13, real generation) |
 
 ## Offline-first
 | Capability | Status |

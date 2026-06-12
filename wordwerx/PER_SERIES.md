@@ -74,6 +74,9 @@ Everything authored now survives a reload:
   transient edit cursor stays local.
 - **Series config** — the drawer's palette/canon edits write through `onSave` → `setSeries`, riding
   the same debounced catalogue PUT (2026-06-12). Canon is editable one-per-line in the drawer.
+- **Episode metadata** — derived in `App.tsx`: the first episode of the first season (per-series
+  seasons state) names what Script / Story / Preview / Publish ship; renaming it on the Seasons
+  board renames the export (2026-06-13).
 - **Co-pilot** is scoped to the seed series (`seed` prop); non-Echo series get no canned Echo Q&A and
   a generic free-text reply that names the active series.
 
