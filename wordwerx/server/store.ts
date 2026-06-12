@@ -36,6 +36,8 @@ export interface SeriesState {
   panels: any[];
   characters: any[];
   bible: Record<string, any>;
+  seasons: any[];
+  arcs: any[];
 }
 export interface SeriesEntry { links: Links; state: SeriesState }
 export interface Db {
@@ -51,7 +53,7 @@ export interface Db {
 function emptySeries(): SeriesEntry {
   return {
     links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, layerImage: {}, locationAngles: {} },
-    state: { library: [], appearance: {}, visdevExtra: {}, panels: [], characters: [], bible: {} },
+    state: { library: [], appearance: {}, visdevExtra: {}, panels: [], characters: [], bible: {}, seasons: [], arcs: [] },
   };
 }
 

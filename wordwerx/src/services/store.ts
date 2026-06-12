@@ -18,6 +18,8 @@ export interface StoreState {
   panels: any[];
   characters: any[];
   bible: Record<string, any>;
+  seasons: any[];
+  arcs: any[];
 }
 
 async function jsonOrThrow(res: Response) {

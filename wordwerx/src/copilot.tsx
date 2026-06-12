@@ -9,7 +9,7 @@ function stageLabel(s: string) {
 
 function stageHint(s: string) {
   return ({
-    story: 'I can tighten loglines, check Echo\'s portrayal rules, or break beats into panels.',
+    story: 'I can tighten loglines, check your portrayal rules, or break beats into panels.',
     library: 'I can generate missing character plates or unify your colour grade.',
     compose: 'I can pace a sequence, suggest transitions, or wire up scroll effects.',
     preview: 'I can run a readability pass and flag contrast or pacing issues.',
@@ -43,8 +43,8 @@ function improvise(text: string, _stage: string) {
 // The canned Q&A + improvised replies are authored around the seed series
 // ("Echo's Location"). For any other series we scope them off and fall back to a
 // generic, honest reply rather than confidently citing Echo's beats and palette.
-function genericReply(_text: string, stage: string) {
-  return `I'm tuned to "Echo's Location" right now, so I'll hold off on specifics for this series. Tell me what you're going for on ${stageLabel(stage).toLowerCase()} and I'll think it through with you — per-series co-pilot tuning is on the way.`;
+function genericReply(_text: string, stage: string, seriesTitle?: string) {
+  return `I don't have tuned guidance for "${seriesTitle || 'this series'}" yet — per-series co-pilot tuning is on the way. Tell me what you're going for on ${stageLabel(stage).toLowerCase()} and I'll think it through with you.`;
 }
 
 export function Copilot({ stage, open, onClose, onApply, episode, seed = true }: any) {
@@ -69,7 +69,7 @@ export function Copilot({ stage, open, onClose, onApply, episode, seed = true }:
     setLog(l => [...l, { who: 'me', text }]); setDraft(''); setBusy(true);
     setTimeout(() => {
       setBusy(false);
-      setLog(l => [...l, { who: 'ai', text: cannedAnswer || (seed ? improvise(text, stage) : genericReply(text, stage)), action: cannedAnswer ? pickAction(stage) : null } as any]);
+      setLog(l => [...l, { who: 'ai', text: cannedAnswer || (seed ? improvise(text, stage) : genericReply(text, stage, episode?.series)), action: cannedAnswer ? pickAction(stage) : null } as any]);
     }, 850);
   }
 

@@ -28,7 +28,6 @@ export function Library({ library, setLibrary, onUseAsset, online, flash, charac
     <div className="ww-library">
       <GenerationPanel
         workflows={['txt2img-flux', 'txt2img-sdxl', 'dataset-batch']}
-        initialPrompt="Sulawesi access tunnel, wet concrete, single failing lamp, lethal night outside, dusk-to-indigo grade"
         showLora online={online} flash={flash} onResult={onResult} onPending={setPending}
       />
       <div className="ww-lib-bar">
@@ -60,7 +59,7 @@ export function Library({ library, setLibrary, onUseAsset, online, flash, charac
   );
 }
 
-export function Story({ panels, episode }: any) {
+export function Story({ panels, episode, canon = [], arcs = [] }: any) {
   const e = episode;
   return (
     <div className="ww-story">
@@ -86,19 +85,15 @@ export function Story({ panels, episode }: any) {
         </div>
         <div className="ww-story-side">
           <div className="ww-insp-sub">Portrayal rules</div>
-          <ul className="ww-rules">
-            <li>Echo is <b>voice only</b> — no avatar, no omniscience.</li>
-            <li>Explicit physical limits; at least one hesitation.</li>
-            <li>Night lethality implied, never explained ("the blanket").</li>
-            <li>POV: Neelai only for Episode 01.</li>
-          </ul>
+          {canon.length ? (
+            <ul className="ww-rules">{canon.map((r: string, i: number) => <li key={i}>{r}</li>)}</ul>
+          ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.55, margin: 0 }}>No canon rules yet — add them in the series configuration.</p>}
           <div className="ww-insp-sub" style={{ marginTop: 18 }}>Throughlines</div>
-          <div className="ww-thru">
-            <span style={{ '--h': '0deg' } as any}>Physics · the cases</span>
-            <span style={{ '--h': '285deg' } as any}>Echo · personhood</span>
-            <span style={{ '--h': '200deg' } as any}>Indu · kinship</span>
-            <span style={{ '--h': '25deg' } as any}>Rajni · control</span>
-          </div>
+          {arcs.length ? (
+            <div className="ww-thru">
+              {arcs.map((a: any) => <span key={a.id} style={{ '--h': (a.hue ?? 200) + 'deg' } as any}>{a.label}</span>)}
+            </div>
+          ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.55, margin: 0 }}>No throughlines yet — add them on the Seasons board.</p>}
         </div>
       </div>
     </div>

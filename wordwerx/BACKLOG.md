@@ -48,6 +48,36 @@ internal `selId` lagged behind `chars`, so the profile indexed an undefined char
 
 ---
 
+## ✅ Done — From-scratch series hardening — 2026-06-12
+Direct on `main`. Audit of the create-a-series-from-scratch flow (first time exercised since the
+wireframe handoff) found three real defects and a cluster of Echo leftovers; all fixed and verified
+end-to-end in a headless-browser walkthrough (12/12 checks + 4/4 edge probes — create series → add
+character → dialogue speaker → seasons/arc edits → config drawer → reload → Echo isolation).
+
+### 1. Season/Arc board edits persist per series ✅
+`ArcBoard` is now controlled by App's per-series state (`seasonsBySeries` / `arcsBySeries`, same
+pattern as panels/characters), hydrated from and persisted to per-series `SeriesState`
+(`seasons` / `arcs` fields in `server/store.ts`). Episode renames, added episodes/throughlines, and
+beat cells survive series switches and reloads. Empty-seasons guard added.
+
+### 2. Series config drawer actually saves ✅
+`SeriesDrawer` "Save configuration" now passes `{ palette, canon }` through an `onSave` prop into
+`setSeries` (persisted by the existing debounced catalogue PUT). Canon rules are editable in the
+drawer (one-per-line textarea, same as the create modal).
+
+### 3. De-Echo'd defaults shown to every series ✅
+- "＋ Add dialogue" defaulted the speaker to `NEELAI` (an Echo character) — now the first cast
+  member, falling back to `NARRATOR` for a zero-cast series.
+- Story stage rendered Echo's hardcoded portrayal rules + throughlines for any series — now rendered
+  from the active series' `canon` (catalogue) and `arcs` (per-series state), with empty states.
+- Beat Sheet "Peak" stat was hardcoded `Crisis · Ep 08` — now computed from the actual beats.
+- Script/Beat headers hardcoded "Ep 01" — now `episode.number`.
+- Library generation prompt was Echo's world ("Sulawesi access tunnel…") — now starts empty.
+- Co-pilot generic reply claimed to be "tuned to Echo's Location" — now names the active series.
+- LoRA form placeholders `echo_v1` / `echo` — now generic.
+
+---
+
 ## Next session
 
 ### Lint debt (carried over)
@@ -58,8 +88,9 @@ to any feature — so it's deliberately left out of the persistence work.
 
 ### Smaller leftovers
 - **Relationships editing** in the bible is still read-only (the rest of the bible is editable now).
-- **Season/Arc edits aren't persisted** — the board is seeded and editable, but `ArcBoard` keeps its
-  edits in local component state (lost on remount/series-switch). Lift to per-series state + persist
-  if real season authoring is wanted.
-- **Series config drawer** (`SeriesDrawer` palette/canon edits) still only flashes "Saved" — not
-  wired to `setSeries`, so config edits don't persist.
+- **Scene system is still Echo's** — `SCRIPT_SCENES` / `COVER_SCENES` and the panel default scene
+  (`tunnels`) are the seed series' procedural placeholder vectors. They work as generic placeholders
+  until real art is assigned; a per-series scene library is a feature, not a bug fix.
+- **Co-pilot is canned** — non-Echo series get an honest generic reply; real per-series AI tuning is
+  future work.
+- App initially mounts with `activeSeries='echo'` (invisible — landing page is the Series hub).

@@ -85,7 +85,8 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, charact
       </div>
 
       {creating && <NewSeriesModal onClose={() => setCreating(false)} onCreate={createSeries} />}
-      {cfg && <SeriesDrawer s={cfg} cast={cfg.id === activeId ? (characters || []) : []} onClose={() => setCfgId(null)} flash={flash} />}
+      {cfg && <SeriesDrawer s={cfg} cast={cfg.id === activeId ? (characters || []) : []} onClose={() => setCfgId(null)} flash={flash}
+        onSave={(patch: any) => setSeries((list: any[]) => list.map((x: any) => x.id === cfg.id ? { ...x, ...patch, updated: 'Just now' } : x))} />}
     </div>
   );
 }
@@ -163,8 +164,9 @@ function NewSeriesModal({ onClose, onCreate }: any) {
   );
 }
 
-function SeriesDrawer({ s, onClose, flash, cast = [] }: any) {
+function SeriesDrawer({ s, onClose, onSave, flash, cast = [] }: any) {
   const [pal, setPal] = React.useState(s.palette);
+  const [canon, setCanon] = React.useState((s.canon || []).join('\n'));
   const ROLES = ['Shadow', 'Midtone', 'Key light', 'Accent', 'Tint', 'Tone'];
   const setColor = (i: number, v: string) => setPal((p: string[]) => p.map((c, j) => j === i ? v : c));
   const removeColor = (i: number) => setPal((p: string[]) => p.filter((_: any, j: number) => j !== i));
@@ -208,8 +210,8 @@ function SeriesDrawer({ s, onClose, flash, cast = [] }: any) {
             </div>
           </div>
           <div className="ww-cfg-block">
-            <div className="ww-insp-sub">Canon rules · the AI will not break these</div>
-            <ul className="ww-cfg-canon">{s.canon.map((c: string, i: number) => <li key={i}>{c}</li>)}</ul>
+            <div className="ww-insp-sub">Canon rules · one per line · the AI will not break these</div>
+            <textarea className="ww-input" rows={4} value={canon} placeholder="One rule per line…" onChange={e => setCanon(e.target.value)} />
           </div>
           <div className="ww-cfg-block">
             <div className="ww-insp-sub">Cast roster · {cast.length || 'none yet'}</div>
@@ -219,7 +221,12 @@ function SeriesDrawer({ s, onClose, flash, cast = [] }: any) {
               </div>
             ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.55, margin: 0 }}>No characters cast yet. Build the roster in the Narrative workspace.</p>}
           </div>
-          <button className="ww-btn primary" style={{ alignSelf: 'flex-start' }} onClick={() => { flash('Saved · ' + s.title); onClose(); }}>Save configuration</button>
+          <button className="ww-btn primary" style={{ alignSelf: 'flex-start' }}
+            onClick={() => {
+              onSave?.({ palette: pal, canon: canon.split('\n').map((c: string) => c.trim()).filter(Boolean) });
+              flash('Saved · ' + s.title);
+              onClose();
+            }}>Save configuration</button>
         </div>
       </aside>
     </React.Fragment>

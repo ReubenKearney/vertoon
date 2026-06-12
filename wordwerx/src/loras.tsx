@@ -141,7 +141,7 @@ function TrainPanel({ onDone, onError, updateLink, characters }: { onDone: (m: s
 
   return (
     <div style={{ marginTop: 16, maxWidth: 640, display: 'grid', gap: 12 }}>
-      <Field label="LoRA name"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={name} onChange={e => setName(e.target.value)} placeholder="echo_v1" /></Field>
+      <Field label="LoRA name"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={name} onChange={e => setName(e.target.value)} placeholder="my_character_v1" /></Field>
       <Field label="Character (for the roster link)">
         {cast.length ? (
           <select className="ww-gen-prompt" style={{ minHeight: 0, height: 36 }} value={character} onChange={e => setCharacter(e.target.value)}>
@@ -149,7 +149,7 @@ function TrainPanel({ onDone, onError, updateLink, characters }: { onDone: (m: s
           </select>
         ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', margin: 0 }}>No characters in this series yet — add one in Narrative to link a trained LoRA.</p>}
       </Field>
-      <Field label="Trigger word"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={trigger} onChange={e => setTrigger(e.target.value)} placeholder={name || 'echo'} /></Field>
+      <Field label="Trigger word"><input className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={trigger} onChange={e => setTrigger(e.target.value)} placeholder={name || 'trigger word'} /></Field>
       <div style={{ display: 'flex', gap: 12 }}>
         <Field label="Steps"><input type="number" className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={steps} onChange={e => setSteps(+e.target.value)} /></Field>
         <Field label="Rank (dim)"><input type="number" className="ww-gen-prompt" style={{ minHeight: 0, height: 34 }} value={rank} onChange={e => setRank(+e.target.value)} /></Field>

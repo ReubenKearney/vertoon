@@ -16,7 +16,7 @@ const NARR_TABS = [
 function charAvatar(tint: number) { return { background: `radial-gradient(78% 78% at 50% 28%, oklch(0.55 0.14 ${tint}), #0a0c12 78%)` }; }
 function storyPanels(panels: any[]) { return panels.filter(p => p.scene !== 'parallax_demo'); }
 
-export function Narrative({ characters, addCharacter, updateCharacter, seasons, arcs, bible, updateBible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
+export function Narrative({ characters, addCharacter, updateCharacter, seasons, setSeasons, arcs, setArcs, bible, updateBible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
   const counts = {
     cast: characters.length, arcs: arcs.length,
     beats: storyPanels(panels).length, script: storyPanels(panels).length,
@@ -33,7 +33,7 @@ export function Narrative({ characters, addCharacter, updateCharacter, seasons, 
       </div>
       <div className="ww-narr-body">
         {tab === 'cast' && <Bible characters={characters} bible={bible} addCharacter={addCharacter} updateCharacter={updateCharacter} updateBible={updateBible} onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
-        {tab === 'arcs' && <ArcBoard seasons={seasons} arcs={arcs} />}
+        {tab === 'arcs' && <ArcBoard seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} />}
         {tab === 'beats' && <BeatSheet panels={panels} setPanels={setPanels} episode={episode} />}
         {tab === 'script' && <ScriptEditor panels={panels} setPanels={setPanels} episode={episode} characters={characters} />}
       </div>
@@ -146,16 +146,29 @@ function Bible({ characters, bible, addCharacter, updateCharacter, updateBible, 
   );
 }
 
-function ArcBoard({ seasons, arcs: arcsSeed }: any) {
-  const season = (seasons || []).find((s: any) => s.id === 's1') || (seasons || [])[0];
-  const [eps, setEps] = React.useState<any[]>(() => (season?.episodes || []).map((e: any) => ({ id: e.id, n: e.n, title: e.title })));
-  const [arcs, setArcs] = React.useState<any[]>(() => (arcsSeed || []).map((a: any) => ({ id: a.id, label: a.label, desc: a.desc, hue: a.hue, beats: { ...a.beats } })));
+// Controlled by App's per-series seasons/arcs state, so board edits persist to
+// the store (and survive a series switch or reload) instead of dying in local
+// component state. Only the transient edit cursor stays local.
+function ArcBoard({ seasons, setSeasons, arcs, setArcs }: any) {
+  const season = (seasons || [])[0];
+  const eps: any[] = season?.episodes || [];
   const [edit, setEdit] = React.useState<any>(null);
   const isEd = (kind: string, arcId: string | undefined, epId: string | undefined) => edit && edit.kind === kind && edit.arcId === arcId && edit.epId === epId;
   const cols = { gridTemplateColumns: `200px repeat(${eps.length}, minmax(134px, 1fr))` };
 
-  const setCell = (arcId: string, epId: string, v: string) => setArcs(as => as.map(a => a.id === arcId ? { ...a, beats: { ...a.beats, [epId]: v } } : a));
-  const setArcField = (arcId: string, k: string, v: string) => setArcs(as => as.map(a => a.id === arcId ? { ...a, [k]: v } : a));
+  if (!season) {
+    return (
+      <div className="ww-arcboard">
+        <div className="ww-pv-kicker">Seasons</div>
+        <p className="ww-arcboard-intro">No season yet for this series.</p>
+      </div>
+    );
+  }
+
+  const setEps = (fn: (es: any[]) => any[]) =>
+    setSeasons((ss: any[]) => ss.map((s: any) => s.id === season.id ? { ...s, episodes: fn(s.episodes || []) } : s));
+  const setCell = (arcId: string, epId: string, v: string) => setArcs((as: any[]) => as.map((a: any) => a.id === arcId ? { ...a, beats: { ...a.beats, [epId]: v } } : a));
+  const setArcField = (arcId: string, k: string, v: string) => setArcs((as: any[]) => as.map((a: any) => a.id === arcId ? { ...a, [k]: v } : a));
   const setEpTitle = (epId: string, v: string) => setEps((es: any[]) => es.map((e: any) => e.id === epId ? { ...e, title: v } : e));
   function addEpisode() { setEps((es: any[]) => [...es, { id: 'epx' + Math.random().toString(36).slice(2, 5), n: es.length + 1, title: 'New episode' }]); }
   function addArc() {
@@ -184,7 +197,7 @@ function ArcBoard({ seasons, arcs: arcsSeed }: any) {
             </div>
           ))}
         </div>
-        {arcs.map(a => (
+        {(arcs || []).map((a: any) => (
           <div key={a.id} className="ww-arcrow" style={{ ...cols, '--h': a.hue + 'deg' } as any}>
             <div className="ww-arc-label">
               {isEd('label', a.id, undefined)
@@ -224,6 +237,7 @@ function BeatSheet({ panels, setPanels, episode }: any) {
   const grouped: any[][] = [[], [], []];
   beats.forEach((b: any, i: number) => grouped[actOf(i, beats.length)].push(b));
   const fxTotal = beats.reduce((n: number, b: any) => n + b.fx.filter((f: any) => f.on).length, 0);
+  const peak = beats.reduce((m: any, b: any) => (TENSION[b.beat] ?? 5) > (m ? TENSION[m.beat] ?? 5 : -1) ? b : m, null);
 
   function rebuild(story: any[]) { const demo = panels.filter((p: any) => p.scene === 'parallax_demo'); setPanels([...demo, ...story.map((p: any, i: number) => ({ ...p, n: i + 1 }))]); }
   function mkPanel() { return { id: 'p' + Math.random().toString(36).slice(2, 6), n: 0, slug: 'NEW PANEL', scene: 'tunnels', beat: 'Draft', dur: '3.0s', caption: 'Untitled beat.', layers: [{ name: 'Background', depth: 0.2 }], fx: [mkFx('reveal')] }; }
@@ -244,7 +258,7 @@ function BeatSheet({ panels, setPanels, episode }: any) {
     <div className="ww-beats">
       <div className="ww-beats-main">
         <div className="ww-beats-head">
-          <h2>Ep 01 — {episode.title}</h2>
+          <h2>{episode.number} — {episode.title}</h2>
           <span>{beats.length} beats · {episode.genre}</span>
         </div>
         {grouped.map((g, ai) => g.length > 0 && (
@@ -290,7 +304,7 @@ function BeatSheet({ panels, setPanels, episode }: any) {
         <div className="ww-insp-sub">At a glance</div>
         <div className="ww-beats-stats">
           <div className="ww-beats-stat"><span>Beats</span><b>{beats.length}</b></div>
-          <div className="ww-beats-stat"><span>Peak</span><b>Crisis · Ep 08</b></div>
+          <div className="ww-beats-stat"><span>Peak</span><b>{peak ? `${peak.beat} · ${String(peak.n).padStart(2, '0')}` : '—'}</b></div>
           <div className="ww-beats-stat"><span>Effects wired</span><b>{fxTotal}</b></div>
           <div className="ww-beats-stat"><span>Dialogue beats</span><b>{beats.filter((b: any) => b.dialogue).length}</b></div>
           <div className="ww-beats-stat"><span>Runtime</span><b>~{beats.reduce((n: number, b: any) => n + (parseFloat(b.dur) || 0), 0).toFixed(0)}s</b></div>
@@ -319,7 +333,7 @@ function ScriptEditor({ panels, setPanels, episode, characters }: any) {
     <div className="ww-script">
       <div className="ww-script-head">
         <div className="ww-pv-kicker">Panel-by-panel script</div>
-        <h2>{episode.series} — Ep 01</h2>
+        <h2>{episode.series} — {episode.number}</h2>
         <span>"{episode.title}" · {beats.length} panels</span>
       </div>
       {beats.map((p: any) => {
@@ -367,7 +381,7 @@ function ScriptEditor({ panels, setPanels, episode, characters }: any) {
                 )}
                 <div className="ww-spanel-pacing">
                   {pace ? <span className="ww-pace-pill">⏸ {pace.params.Mode} · {pace.params.Length}s</span> : <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink3)' }}>no pacing hold</span>}
-                  {!p.dialogue && <button className="ww-varcard-dupe" onClick={() => upd(p.id, { dialogue: '', speaker: 'NEELAI', delivery: 'Spoken' })}>＋ Add dialogue</button>}
+                  {!p.dialogue && <button className="ww-varcard-dupe" onClick={() => upd(p.id, { dialogue: '', speaker: SPEAKERS[0], delivery: 'Spoken' })}>＋ Add dialogue</button>}
                   {p.dialogue != null && <button className="ww-varcard-dupe" style={{ color: 'var(--ink3)' }} onClick={() => upd(p.id, { dialogue: undefined, speaker: undefined, delivery: undefined })}>✕ Remove dialogue</button>}
                 </div>
               </div>

@@ -1,6 +1,7 @@
 # WORDWERX — per-series workbench (as built)
 
-_Implemented 2026-06-10 on branch `feat/per-series-workbench`._
+_Implemented 2026-06-10 on branch `feat/per-series-workbench`; persistence 2026-06-11; from-scratch
+hardening (seasons/arcs persistence, config drawer save, de-Echo'd defaults) 2026-06-12 on `main`._
 
 ## Why
 
@@ -29,11 +30,11 @@ canned co-pilot Q&A `COPILOT` / `COPILOT_X`.
 
 ### 2. App state — `src/App.tsx`
 - **Editable content** is kept in per-series maps `panelsBySeries` / `libraryBySeries` /
-  `charactersBySeries` (`Record<seriesId, any[]>`), lazily seeded from the registry. Derived
-  `panels` / `library` / `characters` plus value-or-updater setters write back to the active
-  series' slot.
-- **Static content** (`seasons / arcs / bible / visdev / episode`) is resolved per active series
-  via `getSeriesContent(...)` in a `useMemo` and passed down as props.
+  `charactersBySeries` / `bibleBySeries` / `seasonsBySeries` / `arcsBySeries`
+  (`Record<seriesId, …>`), lazily seeded from the registry. Derived values plus value-or-updater
+  setters write back to the active series' slot.
+- **Static content** (`visdev / episode`) is resolved per active series via
+  `getSeriesContent(...)` in a `useMemo` and passed down as props.
 - **Store hydration** re-runs whenever `activeSeries` changes (fetches that series' `links` /
   `appearance` / `visdevExtra` / `library`); the workspace components carry `key={activeSeries}`
   so their internal state (e.g. visdev's hydrate ref, selected ids) resets cleanly on switch.
@@ -66,11 +67,15 @@ Everything authored now survives a reload:
   `GET/PUT /api/series`. `App.tsx` loads it on mount, seeds it from the built-in `SERIES` on first
   run (catalogue `null`), and re-persists on create/reorder (debounced). Offline load failures keep
   the in-memory seed and don't clobber a real catalogue.
-- **panels / characters / bible** — folded into per-series `SeriesState` and persisted with the same
-  debounced `patchState` that already handled `library`, then hydrated on series switch. Editable
-  bible/character fields write through `updateBible` / `updateCharacter` in `App.tsx`.
+- **panels / characters / bible / seasons / arcs** — folded into per-series `SeriesState` and
+  persisted with the same debounced `patchState` that already handled `library`, then hydrated on
+  series switch. Editable bible/character fields write through `updateBible` / `updateCharacter`;
+  the Seasons board (`ArcBoard`) is controlled by `setSeasons` / `setArcs` (2026-06-12) — only the
+  transient edit cursor stays local.
+- **Series config** — the drawer's palette/canon edits write through `onSave` → `setSeries`, riding
+  the same debounced catalogue PUT (2026-06-12). Canon is editable one-per-line in the drawer.
 - **Co-pilot** is scoped to the seed series (`seed` prop); non-Echo series get no canned Echo Q&A and
-  a generic free-text reply.
+  a generic free-text reply that names the active series.
 
 > Gotcha that bit us: when the cast hydrates in *after* mount, `<Bible>`'s internal `selId` lags one
 > render behind `chars`, so the profile must fall back to the first character rather than indexing
@@ -78,12 +83,15 @@ Everything authored now survives a reload:
 
 ## Remaining limitations (see `BACKLOG.md`)
 - Bible **relationships** editing is still read-only (the rest is editable).
-- **Season/Arc edits** aren't persisted — `ArcBoard` is seeded + editable but keeps edits in local
-  state.
-- The **series config drawer** (palette/canon) still only flashes "Saved".
+- The **scene picker** (`SCRIPT_SCENES` / `COVER_SCENES` / default `tunnels`) is still the seed
+  series' procedural placeholder vectors — functional as placeholders, a per-series scene library
+  is future work.
 - `npm run lint` debt (`no-explicit-any`, ≈398) is untouched; `npm run build` type-checks clean.
 
 ## Verify
-`npm run dev:all` → Series → ＋ New series → walk: add character → appearance → Develop in Visual
-Dev → Compose ＋ New panel → Publish. Switch to Echo and back to confirm isolation. `npm run build`
-type-checks clean.
+`npm run dev:all` → Series → ＋ New series → walk: add character → Script ＋ Add dialogue (speaker
+defaults to the cast, not NEELAI) → Seasons board: rename/add episodes + throughlines, fill a beat
+cell → Production › Story shows this series' canon + arcs → Series › Configure: edit palette/canon,
+Save → reload: everything survives. Switch to Echo and back to confirm isolation. `npm run build`
+type-checks clean. (Automated walkthrough recipe: headless Chrome + playwright-core against
+localhost:5173 — back up `server/store/db.json` first.)

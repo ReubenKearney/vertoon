@@ -56,6 +56,8 @@ export default function App() {
   const [libraryBySeries, setLibraryBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').library }));
   const [charactersBySeries, setCharactersBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').characters }));
   const [bibleBySeries, setBibleBySeries] = React.useState<Record<string, any>>(() => ({ echo: getSeriesContent('echo').bible }));
+  const [seasonsBySeries, setSeasonsBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').seasons }));
+  const [arcsBySeries, setArcsBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').arcs }));
   const [catalogueReady, setCatalogueReady] = React.useState(false);
   const [selId, setSelId] = React.useState<string | null>(() => getSeriesContent('echo').panels[5]?.id ?? null);
   const [copilot, setCopilot] = React.useState(false);
@@ -76,12 +78,16 @@ export default function App() {
   const library = libraryBySeries[activeSeries] ?? content.library;
   const characters = charactersBySeries[activeSeries] ?? content.characters;
   const bible = bibleBySeries[activeSeries] ?? content.bible;
+  const seasons = seasonsBySeries[activeSeries] ?? content.seasons;
+  const arcs = arcsBySeries[activeSeries] ?? content.arcs;
 
   // Series-scoped setters that accept a value or an updater fn, writing back to
   // the active series' slot (seeding from the registry on first edit).
   const setPanels = (u: any) => setPanelsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.panels) : u }));
   const setLibrary = (u: any) => setLibraryBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.library) : u }));
   const setCharacters = (u: any) => setCharactersBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.characters) : u }));
+  const setSeasons = (u: any) => setSeasonsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.seasons) : u }));
+  const setArcs = (u: any) => setArcsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.arcs) : u }));
 
   // Append a blank character to the active series' cast; returns it so the caller can select it.
   function addCharacter() {
@@ -139,6 +145,8 @@ export default function App() {
         if (state.panels && state.panels.length) setPanelsBySeries(m => ({ ...m, [activeSeries]: state.panels }));
         if (state.characters && state.characters.length) setCharactersBySeries(m => ({ ...m, [activeSeries]: state.characters }));
         if (state.bible && Object.keys(state.bible).length) setBibleBySeries(m => ({ ...m, [activeSeries]: state.bible }));
+        if (state.seasons && state.seasons.length) setSeasonsBySeries(m => ({ ...m, [activeSeries]: state.seasons }));
+        if (state.arcs && state.arcs.length) setArcsBySeries(m => ({ ...m, [activeSeries]: state.arcs }));
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setHydrated(true); });
@@ -157,13 +165,14 @@ export default function App() {
     patchState(activeSeries, { state: { visdevExtra: snapshot } }).catch(() => {});
   }
 
-  // Persist the active series' editable content (library + panels + cast + bible)
-  // after hydration, debounced, so a reload restores everything the user authored.
+  // Persist the active series' editable content (library + panels + cast + bible
+  // + seasons/arcs) after hydration, debounced, so a reload restores everything
+  // the user authored.
   React.useEffect(() => {
     if (!hydrated) return;
-    const id = setTimeout(() => { patchState(activeSeries, { state: { library, panels, characters, bible } }).catch(() => {}); }, 600);
+    const id = setTimeout(() => { patchState(activeSeries, { state: { library, panels, characters, bible, seasons, arcs } }).catch(() => {}); }, 600);
     return () => clearTimeout(id);
-  }, [library, panels, characters, bible, hydrated, activeSeries]);
+  }, [library, panels, characters, bible, seasons, arcs, hydrated, activeSeries]);
 
   // Persist + reflect a link change (character LoRA, canonical, portrait, …) for the active series.
   function updateLink(category: keyof StoreLinks, key: string, value: unknown) {
@@ -308,10 +317,10 @@ export default function App() {
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
             {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} characters={characters} flash={flash} updateLink={updateLink} />}
-            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={content.seasons} arcs={content.arcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
             {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
-              (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={content.episode} /> :
+              (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={content.episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
               (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
               (subs as any).production === 'preview' ? <Preview panels={panels} episode={content.episode} /> :
