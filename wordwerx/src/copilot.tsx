@@ -40,8 +40,15 @@ function improvise(text: string, _stage: string) {
   return 'Noted. Based on the episode beats, I\'d keep the cold open conversational and let the first real motion effect land on the lockdown (panel 4) so the city "closing" is felt, not told.';
 }
 
-export function Copilot({ stage, open, onClose, onApply, episode }: any) {
-  const seeds = (COPILOT[stage] || COPILOT_X[stage] || []);
+// The canned Q&A + improvised replies are authored around the seed series
+// ("Echo's Location"). For any other series we scope them off and fall back to a
+// generic, honest reply rather than confidently citing Echo's beats and palette.
+function genericReply(_text: string, stage: string) {
+  return `I'm tuned to "Echo's Location" right now, so I'll hold off on specifics for this series. Tell me what you're going for on ${stageLabel(stage).toLowerCase()} and I'll think it through with you — per-series co-pilot tuning is on the way.`;
+}
+
+export function Copilot({ stage, open, onClose, onApply, episode, seed = true }: any) {
+  const seeds = seed ? (COPILOT[stage] || COPILOT_X[stage] || []) : [];
   const [log, setLog] = React.useState([
     { who: 'ai', text: `I'm watching the ${stageLabel(stage)} stage. Ask me anything about "${episode.title}", or try a suggestion.` },
   ]);
@@ -62,7 +69,7 @@ export function Copilot({ stage, open, onClose, onApply, episode }: any) {
     setLog(l => [...l, { who: 'me', text }]); setDraft(''); setBusy(true);
     setTimeout(() => {
       setBusy(false);
-      setLog(l => [...l, { who: 'ai', text: cannedAnswer || improvise(text, stage), action: cannedAnswer ? pickAction(stage) : null } as any]);
+      setLog(l => [...l, { who: 'ai', text: cannedAnswer || (seed ? improvise(text, stage) : genericReply(text, stage)), action: cannedAnswer ? pickAction(stage) : null } as any]);
     }, 850);
   }
 

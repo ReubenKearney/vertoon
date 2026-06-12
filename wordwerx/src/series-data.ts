@@ -30,12 +30,17 @@ export const ECHO_CONTENT: SeriesContent = {
 };
 
 // An empty content bundle for a freshly created series. The episode is derived
-// from the series' own metadata so Preview/Publish have a title to show.
+// from the series' own metadata so Preview/Publish have a title to show. The
+// Seasons board is seeded with one empty season + throughline so the grid reads
+// as a startable scaffold rather than a blank void.
 export function blankContent(series: any): SeriesContent {
   return {
     characters: [],
-    seasons: [],
-    arcs: [],
+    seasons: [{
+      id: 's1', series: series?.id || 'new', n: 1, title: 'New season',
+      premise: '', episodes: [{ id: 'ep1', n: 1, title: 'Episode 1', status: 'Idea', beats: 0, panels: 0, log: '' }],
+    }],
+    arcs: [{ id: 'arc1', label: 'Main throughline', desc: 'What this thread is about.', hue: 200, beats: {} }],
     bible: {},
     visdev: [],
     panels: [],

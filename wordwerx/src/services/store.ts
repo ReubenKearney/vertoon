@@ -11,7 +11,14 @@ export interface StoreLinks {
   layerImage: Record<string, string>;
   locationAngles: Record<string, string[]>;
 }
-export interface StoreState { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> }
+export interface StoreState {
+  library: any[];
+  appearance: Record<string, string>;
+  visdevExtra: Record<string, any>;
+  panels: any[];
+  characters: any[];
+  bible: Record<string, any>;
+}
 
 async function jsonOrThrow(res: Response) {
   const body = await res.json().catch(() => ({}));
@@ -53,6 +60,19 @@ export function assetIdOf(idOrUrl?: string): string | undefined {
   if (!idOrUrl) return undefined;
   const m = idOrUrl.match(/\/api\/assets\/([^/?#]+)/);
   return m ? m[1] : (idOrUrl.includes('/') ? undefined : idOrUrl);
+}
+
+// The series catalogue (list of series) is global, not per-series. Returns null
+// until first seeded so the app knows to persist its built-in SERIES on first run.
+export async function getCatalogue(): Promise<any[] | null> {
+  const body = await jsonOrThrow(await fetch('/api/series')) as { series: any[] | null };
+  return body.series ?? null;
+}
+
+export async function putCatalogue(series: any[]): Promise<void> {
+  await jsonOrThrow(await fetch('/api/series', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ series }),
+  }));
 }
 
 // State + links are namespaced per series; pass the active series id through to

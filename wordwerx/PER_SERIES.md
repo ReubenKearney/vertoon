@@ -60,12 +60,28 @@ the blank-series loop drivable:
 `compose.tsx` is content-agnostic (only `mkFx`); it gained a **no-panels empty state** so it no
 longer crashes for a blank series.
 
-## Known limitations (see `BACKLOG.md`)
-- The **series catalogue** and in-memory `panels`/`characters` are **not persisted across reload**
-  — only the store-backed per-series `links`/`appearance`/`visdevExtra`/`library` survive. A new
-  series disappears on refresh.
-- Bible depth fields and co-pilot content are seed/Echo-flavoured only.
-- Pre-existing button-nested-in-button warning in the series switcher.
+## Persistence (as built, 2026-06-11)
+Everything authored now survives a reload:
+- **Series catalogue** — a global `catalogue` field in `server/store.ts`, exposed as
+  `GET/PUT /api/series`. `App.tsx` loads it on mount, seeds it from the built-in `SERIES` on first
+  run (catalogue `null`), and re-persists on create/reorder (debounced). Offline load failures keep
+  the in-memory seed and don't clobber a real catalogue.
+- **panels / characters / bible** — folded into per-series `SeriesState` and persisted with the same
+  debounced `patchState` that already handled `library`, then hydrated on series switch. Editable
+  bible/character fields write through `updateBible` / `updateCharacter` in `App.tsx`.
+- **Co-pilot** is scoped to the seed series (`seed` prop); non-Echo series get no canned Echo Q&A and
+  a generic free-text reply.
+
+> Gotcha that bit us: when the cast hydrates in *after* mount, `<Bible>`'s internal `selId` lags one
+> render behind `chars`, so the profile must fall back to the first character rather than indexing
+> with a stale id (else `c.tint` throws and the tree unmounts).
+
+## Remaining limitations (see `BACKLOG.md`)
+- Bible **relationships** editing is still read-only (the rest is editable).
+- **Season/Arc edits** aren't persisted — `ArcBoard` is seeded + editable but keeps edits in local
+  state.
+- The **series config drawer** (palette/canon) still only flashes "Saved".
+- `npm run lint` debt (`no-explicit-any`, ≈398) is untouched; `npm run build` type-checks clean.
 
 ## Verify
 `npm run dev:all` → Series → ＋ New series → walk: add character → appearance → Develop in Visual

@@ -15,7 +15,7 @@ import { VisualDev } from './visdev';
 import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
 import { getBalance } from './services/runpod';
-import { getState, patchState, setLink as apiSetLink, type StoreLinks } from './services/store';
+import { getState, patchState, setLink as apiSetLink, getCatalogue, putCatalogue, type StoreLinks } from './services/store';
 import { UIContext, useUIProvider, Lightbox } from './ui-context';
 
 const TWEAK_DEFAULTS = {
@@ -55,6 +55,8 @@ export default function App() {
   const [panelsBySeries, setPanelsBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').panels }));
   const [libraryBySeries, setLibraryBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').library }));
   const [charactersBySeries, setCharactersBySeries] = React.useState<Record<string, any[]>>(() => ({ echo: getSeriesContent('echo').characters }));
+  const [bibleBySeries, setBibleBySeries] = React.useState<Record<string, any>>(() => ({ echo: getSeriesContent('echo').bible }));
+  const [catalogueReady, setCatalogueReady] = React.useState(false);
   const [selId, setSelId] = React.useState<string | null>(() => getSeriesContent('echo').panels[5]?.id ?? null);
   const [copilot, setCopilot] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
@@ -73,6 +75,7 @@ export default function App() {
   const panels = panelsBySeries[activeSeries] ?? content.panels;
   const library = libraryBySeries[activeSeries] ?? content.library;
   const characters = charactersBySeries[activeSeries] ?? content.characters;
+  const bible = bibleBySeries[activeSeries] ?? content.bible;
 
   // Series-scoped setters that accept a value or an updater fn, writing back to
   // the active series' slot (seeding from the registry on first edit).
@@ -87,6 +90,41 @@ export default function App() {
     return c;
   }
 
+  // Edit a character's identity fields (name / role / desc) in the active series.
+  const updateCharacter = (id: string, patch: any) => setCharacters((cs: any[]) => cs.map((c: any) => c.id === id ? { ...c, ...patch } : c));
+
+  // Edit one bible field (wants / flaw / voice / secret / arc) for a character in
+  // the active series, seeding from the registry bible on first edit.
+  const updateBible = (charId: string, field: string, value: any) =>
+    setBibleBySeries(m => {
+      const cur = m[activeSeries] ?? content.bible;
+      return { ...m, [activeSeries]: { ...cur, [charId]: { ...(cur[charId] || {}), [field]: value } } };
+    });
+
+  // Load the persisted series catalogue on mount. null => first run: seed the
+  // store from the built-in SERIES. On failure (offline) keep the in-memory seed
+  // and don't persist, so we never clobber a real catalogue with the defaults.
+  React.useEffect(() => {
+    let cancelled = false;
+    getCatalogue()
+      .then(cat => {
+        if (cancelled) return;
+        if (cat && cat.length) setSeries(cat);
+        else putCatalogue(SERIES).catch(() => {});
+        setCatalogueReady(true);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist the catalogue whenever it changes (after the initial load), debounced,
+  // so a newly created or reordered series survives a reload.
+  React.useEffect(() => {
+    if (!catalogueReady) return;
+    const id = setTimeout(() => { putCatalogue(series).catch(() => {}); }, 600);
+    return () => clearTimeout(id);
+  }, [series, catalogueReady]);
+
   // Hydrate persisted state + links for the active series (re-runs on series switch).
   React.useEffect(() => {
     let cancelled = false;
@@ -98,6 +136,9 @@ export default function App() {
         setAppearance(state.appearance || {});
         setVisdevExtra(state.visdevExtra || {});
         if (state.library && state.library.length) setLibraryBySeries(m => ({ ...m, [activeSeries]: state.library }));
+        if (state.panels && state.panels.length) setPanelsBySeries(m => ({ ...m, [activeSeries]: state.panels }));
+        if (state.characters && state.characters.length) setCharactersBySeries(m => ({ ...m, [activeSeries]: state.characters }));
+        if (state.bible && Object.keys(state.bible).length) setBibleBySeries(m => ({ ...m, [activeSeries]: state.bible }));
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setHydrated(true); });
@@ -116,12 +157,13 @@ export default function App() {
     patchState(activeSeries, { state: { visdevExtra: snapshot } }).catch(() => {});
   }
 
-  // Persist the active series' library (seed + generated) after hydration, debounced.
+  // Persist the active series' editable content (library + panels + cast + bible)
+  // after hydration, debounced, so a reload restores everything the user authored.
   React.useEffect(() => {
     if (!hydrated) return;
-    const id = setTimeout(() => { patchState(activeSeries, { state: { library } }).catch(() => {}); }, 600);
+    const id = setTimeout(() => { patchState(activeSeries, { state: { library, panels, characters, bible } }).catch(() => {}); }, 600);
     return () => clearTimeout(id);
-  }, [library, hydrated, activeSeries]);
+  }, [library, panels, characters, bible, hydrated, activeSeries]);
 
   // Persist + reflect a link change (character LoRA, canonical, portrait, …) for the active series.
   function updateLink(category: keyof StoreLinks, key: string, value: unknown) {
@@ -208,7 +250,11 @@ export default function App() {
           </button>
         </div>
 
-        <button className={cx('ww-series-switch', seriesMenu && 'is-open')} onClick={() => setSeriesMenu(m => !m)}>
+        {/* role=button (not a real <button>) so the dropdown's <button> items
+            aren't nested inside a button — invalid HTML + a hydration error. */}
+        <div className={cx('ww-series-switch', seriesMenu && 'is-open')} role="button" tabIndex={0}
+          onClick={() => setSeriesMenu(m => !m)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSeriesMenu(m => !m); } }}>
           <div className="ww-series-switch-cover"><Scene kind={(activeObj as any).cover} /></div>
           <div className="ww-series-switch-meta"><b>{(activeObj as any).title}</b><span>{(activeObj as any).status}</span></div>
           <span className="ww-series-switch-chev">▾</span>
@@ -227,7 +273,7 @@ export default function App() {
               </div>
             </div>
           )}
-        </button>
+        </div>
 
         <div className="ww-nav2-scroll">
           {NAV.map(item => (
@@ -262,8 +308,8 @@ export default function App() {
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
             {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} characters={characters} flash={flash} updateLink={updateLink} />}
-            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} seasons={content.seasons} arcs={content.arcs} bible={content.bible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
-            {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={content.bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
+            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={content.seasons} arcs={content.arcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={content.episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
               (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={content.episode} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
@@ -272,7 +318,7 @@ export default function App() {
               <Publish panels={panels} library={library} links={links} episode={content.episode} characters={characters} updateLink={updateLink} flash={flash} />
             )}
           </main>
-          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={content.episode} />}
+          {showCop && <Copilot stage={copContext} open={copilot} onClose={() => setCopilot(false)} onApply={onApply} episode={content.episode} seed={activeSeries === 'echo'} />}
         </div>
       </div>
 

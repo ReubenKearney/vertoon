@@ -14,7 +14,7 @@
 .ww-brandmark svg{width:24px;height:24px;display:block;}
 .ww-brand-word{font-family:var(--font-disp);font-weight:700;font-size:14px;letter-spacing:.06em;line-height:1;}
 .ww-brand-word span{display:block;font-family:var(--font-mono);font-size:7.5px;color:var(--ink3);letter-spacing:.14em;text-transform:uppercase;margin-top:3px;font-weight:400;}
-.ww-series-switch{margin:0 12px 8px;display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);width:calc(100% - 24px);text-align:left;transition:.14s;position:relative;}
+.ww-series-switch{margin:0 12px 8px;display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);width:calc(100% - 24px);text-align:left;transition:.14s;position:relative;cursor:pointer;}
 .ww-series-switch:hover{box-shadow:inset 0 0 0 1px var(--line2);}
 .ww-series-switch-cover{width:30px;height:30px;border-radius:8px;overflow:hidden;position:relative;flex-shrink:0;box-shadow:inset 0 0 0 1px var(--line);}
 .ww-series-switch-meta{flex:1;min-width:0;}
@@ -232,6 +232,16 @@ textarea.ww-input{resize:vertical;line-height:1.55;}
 .ww-bp-cell{background:var(--bg2);border-radius:12px;padding:14px 15px;box-shadow:inset 0 0 0 1px var(--line);}
 .ww-bp-cell .ww-insp-sub{margin-bottom:7px;}
 .ww-bp-cell p{margin:0;font-size:13px;line-height:1.5;color:var(--ink);text-wrap:pretty;}
+/* editable bible fields — blend into the text, reveal an affordance on hover/focus */
+.ww-bp-edit{display:block;width:100%;box-sizing:border-box;background:transparent;border:1px solid transparent;border-radius:7px;color:var(--ink);font-family:var(--font-ui);outline:none;resize:vertical;transition:border-color .14s,background .14s;}
+.ww-bp-edit:hover{border-color:var(--line);}
+.ww-bp-edit:focus{border-color:var(--accent2);background:var(--bg);}
+.ww-bp-edit::placeholder{color:var(--ink3);}
+.ww-bp-edit-name{font-family:var(--font-disp);font-size:30px;font-weight:600;letter-spacing:-.01em;padding:2px 6px;margin:-2px -6px 0;}
+.ww-bp-edit-role{font-size:13px;color:var(--ink2);padding:4px 6px;margin:5px -6px 0;}
+.ww-bp-edit-desc{font-size:13.5px;line-height:1.6;padding:5px 6px;margin:6px -6px 0;max-width:560px;}
+.ww-bp-cell .ww-bp-edit{font-size:13px;line-height:1.5;padding:5px 6px;margin:0 -6px;}
+.ww-bp-arc .ww-bp-edit{font-size:12.5px;padding:5px 8px;}
 .ww-bp-arc{display:flex;align-items:center;gap:10px;background:var(--bg2);border-radius:12px;padding:14px 16px;box-shadow:inset 0 0 0 1px var(--line);margin-bottom:24px;}
 .ww-bp-arc-track{flex:1;display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);}
 .ww-bp-arc-track i{flex:1;height:2px;background:linear-gradient(90deg,var(--ink3),var(--accent));border-radius:2px;}

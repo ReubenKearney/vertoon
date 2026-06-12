@@ -13,7 +13,7 @@ import { createReadStream } from 'node:fs';
 import { submitRun, getStatus, cancelJob, getBalance } from './runpod.js';
 import { listLoras, uploadLora, uploadTrainingImage, deleteLora } from './loras.js';
 import { buildTrainWorkflow } from './train-workflow.js';
-import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, isLinkKey, assetCount } from './store.js';
+import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, isLinkKey, assetCount, getCatalogue, setCatalogue } from './store.js';
 
 const app = express();
 // Larger limit: /api/assets receives base64 images.
@@ -52,6 +52,16 @@ app.get('/api/assets/:id', wrap(async (req, res) => {
 
 app.delete('/api/assets/:id', wrap(async (req, res) => {
   await deleteAsset(req.params.id);
+  res.json({ ok: true });
+}));
+
+// --- Series catalogue (the list of series; persisted so new series survive) --
+app.get('/api/series', wrap(async (_req, res) => { res.json({ series: await getCatalogue() }); }));
+
+app.put('/api/series', wrap(async (req, res) => {
+  const { series } = req.body || {};
+  if (!Array.isArray(series)) return res.status(400).json({ error: 'series array is required' });
+  await setCatalogue(series);
   res.json({ ok: true });
 }));
 

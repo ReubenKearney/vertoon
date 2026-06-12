@@ -16,7 +16,7 @@ const NARR_TABS = [
 function charAvatar(tint: number) { return { background: `radial-gradient(78% 78% at 50% 28%, oklch(0.55 0.14 ${tint}), #0a0c12 78%)` }; }
 function storyPanels(panels: any[]) { return panels.filter(p => p.scene !== 'parallax_demo'); }
 
-export function Narrative({ characters, addCharacter, seasons, arcs, bible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
+export function Narrative({ characters, addCharacter, updateCharacter, seasons, arcs, bible, updateBible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
   const counts = {
     cast: characters.length, arcs: arcs.length,
     beats: storyPanels(panels).length, script: storyPanels(panels).length,
@@ -32,7 +32,7 @@ export function Narrative({ characters, addCharacter, seasons, arcs, bible, pane
         ))}
       </div>
       <div className="ww-narr-body">
-        {tab === 'cast' && <Bible characters={characters} bible={bible} addCharacter={addCharacter} onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+        {tab === 'cast' && <Bible characters={characters} bible={bible} addCharacter={addCharacter} updateCharacter={updateCharacter} updateBible={updateBible} onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
         {tab === 'arcs' && <ArcBoard seasons={seasons} arcs={arcs} />}
         {tab === 'beats' && <BeatSheet panels={panels} setPanels={setPanels} episode={episode} />}
         {tab === 'script' && <ScriptEditor panels={panels} setPanels={setPanels} episode={episode} characters={characters} />}
@@ -41,7 +41,7 @@ export function Narrative({ characters, addCharacter, seasons, arcs, bible, pane
   );
 }
 
-function Bible({ characters, bible, addCharacter, onGoVisual, links, appearance, updateAppearance }: any) {
+function Bible({ characters, bible, addCharacter, updateCharacter, updateBible, onGoVisual, links, appearance, updateAppearance }: any) {
   const ui = useUI();
   const chars = characters as any[];
   const [selId, setSelId] = React.useState<string | null>(chars[0]?.id ?? null);
@@ -62,7 +62,10 @@ function Bible({ characters, bible, addCharacter, onGoVisual, links, appearance,
     );
   }
 
-  const sid = selId as string; // non-null here: the empty-cast case returned above
+  // selId can lag behind chars (e.g. the cast is hydrated in from the store after
+  // mount), so fall back to the first character rather than indexing with a stale
+  // id and rendering an undefined profile. The effect above re-syncs selId after.
+  const sid = (chars.some(x => x.id === selId) ? selId : chars[0]?.id) as string;
   const c = chars.find(x => x.id === sid) as any;
   const b = bible[sid] || {};
   const appText = (appearance && appearance[sid] != null) ? appearance[sid] : (b.appearance || '');
@@ -96,9 +99,9 @@ function Bible({ characters, bible, addCharacter, onGoVisual, links, appearance,
             {avImg ? <img className="ww-zoomable" src={avImg} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => ui.openImage(avImg)} /> : <span>{c.name[0]}</span>}
           </div>
           <div className="ww-bp-h">
-            <h1>{c.name}</h1>
-            <div className="ww-bp-role">{c.role}</div>
-            <div className="ww-bp-desc">{c.desc}</div>
+            <input className="ww-bp-edit ww-bp-edit-name" value={c.name || ''} placeholder="Character name" onChange={e => updateCharacter?.(c.id, { name: e.target.value })} />
+            <input className="ww-bp-edit ww-bp-edit-role" value={c.role || ''} placeholder="Role · pronoun" onChange={e => updateCharacter?.(c.id, { role: e.target.value })} />
+            <textarea className="ww-bp-edit ww-bp-edit-desc" rows={2} value={c.desc || ''} placeholder="A line that sums them up…" onChange={e => updateCharacter?.(c.id, { desc: e.target.value })} />
           </div>
         </div>
         <div className="ww-bp-appear">
@@ -112,17 +115,14 @@ function Bible({ characters, bible, addCharacter, onGoVisual, links, appearance,
           <button className="ww-bp-appear-link" onClick={() => onGoVisual && onGoVisual(selId)}>{`Develop ${c.name.split(' ')[0]}'s look in Visual Dev →`}</button>
         </div>
         <div className="ww-bp-grid">
-          <div className="ww-bp-cell"><div className="ww-insp-sub">Wants</div><p>{b.wants}</p></div>
-          <div className="ww-bp-cell"><div className="ww-insp-sub">Flaw</div><p>{b.flaw}</p></div>
-          <div className="ww-bp-cell"><div className="ww-insp-sub">Voice</div><p>{b.voice}</p></div>
-          <div className="ww-bp-cell"><div className="ww-insp-sub">Secret</div><p>{b.secret}</p></div>
+          <div className="ww-bp-cell"><div className="ww-insp-sub">Wants</div><textarea className="ww-bp-edit" rows={2} value={b.wants || ''} placeholder="What they're chasing…" onChange={e => updateBible?.(sid, 'wants', e.target.value)} /></div>
+          <div className="ww-bp-cell"><div className="ww-insp-sub">Flaw</div><textarea className="ww-bp-edit" rows={2} value={b.flaw || ''} placeholder="What trips them up…" onChange={e => updateBible?.(sid, 'flaw', e.target.value)} /></div>
+          <div className="ww-bp-cell"><div className="ww-insp-sub">Voice</div><textarea className="ww-bp-edit" rows={2} value={b.voice || ''} placeholder="How they sound on the page…" onChange={e => updateBible?.(sid, 'voice', e.target.value)} /></div>
+          <div className="ww-bp-cell"><div className="ww-insp-sub">Secret</div><textarea className="ww-bp-edit" rows={2} value={b.secret || ''} placeholder="What they're hiding…" onChange={e => updateBible?.(sid, 'secret', e.target.value)} /></div>
         </div>
         <div className="ww-insp-sub">Season arc</div>
         <div className="ww-bp-arc">
-          <div className="ww-bp-arc-track">
-            <span>{(b.arc || '').split('→')[0]}</span><i />
-            <span style={{ color: 'var(--accent)' }}>{(b.arc || '').split('→').slice(-1)[0]}</span>
-          </div>
+          <input className="ww-bp-edit" value={b.arc || ''} placeholder="start → turn → end" onChange={e => updateBible?.(sid, 'arc', e.target.value)} />
         </div>
         {b.rels && b.rels.length > 0 && (
           <React.Fragment>

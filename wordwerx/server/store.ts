@@ -27,11 +27,23 @@ export interface Links {
   layerImage: Record<string, string>;            // "panelId:layerIdx" -> assetId
   locationAngles: Record<string, string[]>;      // subj -> assetId[]
 }
-export interface SeriesState { library: any[]; appearance: Record<string, string>; visdevExtra: Record<string, any> }
+export interface SeriesState {
+  library: any[];
+  appearance: Record<string, string>;
+  visdevExtra: Record<string, any>;
+  // Editable authoring content persisted per series so a new series — and its
+  // cast/panels/bible edits — survive a reload (seeded blank for non-seed series).
+  panels: any[];
+  characters: any[];
+  bible: Record<string, any>;
+}
 export interface SeriesEntry { links: Links; state: SeriesState }
 export interface Db {
   // Assets are content-addressed blobs shared across series (links point into them).
   assets: Record<string, AssetMeta>;
+  // The series catalogue (list of series metadata). null until first persisted;
+  // the frontend seeds it from its built-in SERIES on first run.
+  catalogue: any[] | null;
   // Everything else is namespaced by series id so a new series starts blank.
   series: Record<string, SeriesEntry>;
 }
@@ -39,11 +51,11 @@ export interface Db {
 function emptySeries(): SeriesEntry {
   return {
     links: { characterLora: {}, characterPortrait: {}, visdevVariant: {}, visdevCanonical: {}, panelImage: {}, layerImage: {}, locationAngles: {} },
-    state: { library: [], appearance: {}, visdevExtra: {} },
+    state: { library: [], appearance: {}, visdevExtra: {}, panels: [], characters: [], bible: {} },
   };
 }
 
-const EMPTY: Db = { assets: {}, series: {} };
+const EMPTY: Db = { assets: {}, catalogue: null, series: {} };
 
 let cache: Db | null = null;
 let writing: Promise<void> = Promise.resolve();
@@ -51,7 +63,7 @@ let writing: Promise<void> = Promise.resolve();
 // Normalize a raw db blob into the current per-series shape, migrating the old
 // flat { assets, links, state } layout (single global series) into series.echo.
 function normalizeDb(raw: any): Db {
-  const db: Db = { assets: raw?.assets || {}, series: {} };
+  const db: Db = { assets: raw?.assets || {}, catalogue: raw?.catalogue ?? null, series: {} };
   if (raw && (raw.links || raw.state) && !raw.series) {
     // Legacy flat shape — everything belonged to the seed series.
     db.series.echo = mergeSeries(raw.links, raw.state);
@@ -135,6 +147,18 @@ export async function deleteAsset(id: string): Promise<void> {
   if (!a) return;
   await unlink(join(ASSETS_DIR, a.file)).catch(() => {});
   delete db.assets[id];
+  await writeDb(db);
+}
+
+// The series catalogue is a single global list (not namespaced) — the set of
+// series the workbench knows about. Returns null until the frontend seeds it.
+export async function getCatalogue(): Promise<any[] | null> {
+  return (await readDb()).catalogue;
+}
+
+export async function setCatalogue(catalogue: any[]): Promise<void> {
+  const db = await readDb();
+  db.catalogue = catalogue;
   await writeDb(db);
 }
 

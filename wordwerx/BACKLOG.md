@@ -11,42 +11,55 @@ per-series with no Echo leakage; Echo stays intact across series switches.
 
 ---
 
-## Next session — items discovered while building the above
+## ✅ Done — Persistence + per-series authoring depth — 2026-06-11
+Branch `feat/per-series-workbench`. Items 1–3 below are implemented and verified end-to-end in
+the browser (create series → add/rename character → edit bible → reload → switch back: everything
+hydrates; Echo stays isolated and intact). See `PER_SERIES.md` for the updated architecture.
 
-### 1. Persist the series catalogue + per-series panels/characters across reload
-**Highest-value follow-up.** Today only the *store-backed* per-series data survives a reload
-(`links` / `appearance` / `visdevExtra` / `library`, namespaced by series id in `server/store.ts`).
-The **series list itself** and the in-memory `panelsBySeries` / `charactersBySeries` maps in
-`src/App.tsx` are seeded fresh on every load, so a newly created series — and any panels/cast
-added to it — disappears on refresh (and its store partition is orphaned under a random id).
-To do:
-- Persist the series catalogue (add a `series[]` catalogue to the store, or a new `/api/series`).
-- Persist `panels` and `characters` per series (extend `SeriesState` in `server/store.ts` to carry
-  them, or fold them into the existing per-series `state`), and hydrate them on series switch in
-  `src/App.tsx` alongside `library`.
-- Give new series a stable id that the store partition keys on (already random in `series.tsx`,
-  just needs to be persisted with the catalogue).
+### 1. Persist the series catalogue + per-series panels/characters/bible across reload ✅
+- **Catalogue** persists via a new global `GET/PUT /api/series` (`catalogue` field in `server/store.ts`).
+  `App.tsx` loads it on mount; on first run (catalogue `null`) it seeds the store from the built-in
+  `SERIES`, and persists any create/reorder (debounced). Offline failures keep the in-memory seed
+  and never clobber a real catalogue.
+- **panels / characters / bible** are now part of per-series `SeriesState` (`server/store.ts`),
+  persisted with the existing debounced `patchState` (alongside `library`) and hydrated on series
+  switch in `App.tsx`. A new series — and its cast/panels/bible — now survives a refresh.
 
-### 2. Fix button-nested-in-button in the series switcher
-`.ww-series-switch` (a `<button>`, ~`src/App.tsx:178`) contains the dropdown whose
-`.ww-series-menu-item`s are also `<button>`s → invalid HTML + a React hydration error in the
-console. Make the outer element a `<div role="button">` (or move the menu out of the button).
-Pre-existing; surfaced during verification. (Flagged as a background task chip.)
+### 2. Fix button-nested-in-button in the series switcher ✅
+`.ww-series-switch` is now a `<div role="button" tabIndex=0>` (with Enter/Space handling) instead of
+a `<button>`, so the dropdown's `<button>` items aren't nested in a button. Verified: 0 nested
+buttons in the DOM, no hydration error, dropdown still opens/switches. Added `cursor:pointer` to the
+rule (the only thing lost vs the `button` reset).
 
-### 3. Per-series authoring depth (currently blank/seed-only)
-- **Bible fields** (wants / flaw / voice / secret / arc / relationships) are read-only seed text;
-  a blank character shows them empty. Make them editable + persisted per series if we want real
-  authoring for non-seed series.
-- **Co-pilot** content (`COPILOT` / `COPILOT_X`) is Echo-flavoured canned Q&A for every series.
-  Either scope it per series or hide/relabel it for non-seed series.
-- **Seasons/Arc board** starts fully empty for a blank series (the `＋ Episode` / `＋ Throughline`
-  buttons build from zero). Consider seeding one empty season so the grid reads better.
+### 3. Per-series authoring depth ✅
+- **Bible fields** (name / role / desc + wants / flaw / voice / secret / arc) are now inline-editable
+  and persisted per series (`updateCharacter` / `updateBible` in `App.tsx`; editable fields +
+  `.ww-bp-edit*` styling in `narrative.tsx` / `styles2.css`). Relationships stay read-only (editing
+  that graph is a heavier follow-up — see below).
+- **Co-pilot** is scoped to the seed: for non-Echo series the canned Echo Q&A chips are hidden and
+  free-text replies fall back to an honest generic message instead of citing Echo's beats/palette
+  (`seed` prop + `genericReply` in `copilot.tsx`).
+- **Seasons/Arc board** seeds one starter season + episode + throughline for a blank series
+  (`blankContent` in `series-data.ts`) so the grid reads as a startable scaffold.
 
-### 4. Lint debt
+Also fixed a latent `<Bible>` crash this surfaced: when the cast hydrates in after mount, the
+internal `selId` lagged behind `chars`, so the profile indexed an undefined character and threw on
+`c.tint`. `narrative.tsx` now falls back to the first character when `selId` is stale.
+
+---
+
+## Next session
+
+### Lint debt (carried over)
 The repo fails `@typescript-eslint/no-explicit-any` across the board (≈398 errors, incl. untouched
-files like `world.ts:1`). New per-series code follows the same `any` convention. If we want a clean
-`npm run lint`, that's a dedicated typing pass — not specific to this feature.
+files like `world.ts:1`). New per-series code follows the same `any` convention. `npm run build`
+type-checks clean; only `npm run lint` fails. Cleaning it is a dedicated typing pass — not specific
+to any feature — so it's deliberately left out of the persistence work.
 
-Files (this feature): `src/series-data.ts` (new), `src/App.tsx`, `src/narrative.tsx`, `src/visdev.tsx`,
-`src/loras.tsx`, `src/stages.tsx`, `src/preview.tsx`, `src/compose.tsx`, `src/series.tsx`,
-`src/services/store.ts`, `server/store.ts`, `server/index.ts`.
+### Smaller leftovers
+- **Relationships editing** in the bible is still read-only (the rest of the bible is editable now).
+- **Season/Arc edits aren't persisted** — the board is seeded and editable, but `ArcBoard` keeps its
+  edits in local component state (lost on remount/series-switch). Lift to per-series state + persist
+  if real season authoring is wanted.
+- **Series config drawer** (`SeriesDrawer` palette/canon edits) still only flashes "Saved" — not
+  wired to `setSeries`, so config edits don't persist.
