@@ -100,7 +100,11 @@ Run **Tasks: Run Task → "WORDWERX: Restart dev server + open Chrome"**, then:
 - `PATCH /api/state` + `POST /api/links/*` merge; `GET /api/state` reflects them.
 - Survives **server restart** (db.json on disk); `/api/health` → `{store:true, assetCount}`.
 
-**Tier 6 — Offline (manual, the core requirement):**
+**Tier 6 — Offline (the core requirement):** steps 5 of this tier is ✅ **verified by
+automation** (2026-06-13): a from-scratch episode with real generated art was exported and the
+`.html` opened fresh from disk in a browser context with **all network requests blocked** —
+both panels rendered base64 art + dialogue, scroll-reveal ran, 0 requests, 0 errors. Steps 1–4
+and 6 (in-app behaviour while offline) remain a manual pass.
 1. `npm run dev:all` (or the VS Code task). Generate in Library → confirm a file appears in `server/store/assets/`.
 2. Block `api.runpod.ai` (or pull Wi-Fi); keep the server running.
 3. Refresh → thumbnails / portraits / canonical / panel art re-render from `/api/assets/*` (hydrated from `/api/state`).
@@ -124,6 +128,7 @@ Run **Tasks: Run Task → "WORDWERX: Restart dev server + open Chrome"**, then:
 - Tier 5: ✅ automated (store POST/GET/state/links, restart-persistence).
 - Tier 7 render smoke: ✅ via Preview MCP — every wired screen mounts with **zero console errors** (Library/Visdev inspector GenerationPanels, Locations, Bible LoRA+portrait, LoRA Manager, Publish with 12 panel-assign rows); a browser-driven Library generate reached IN_QUEUE/Cancel.
 - Tier 8: ✅ real training run completed; LoRA written + listed.
-- Tiers 6 (offline) + 7 interactions: ⏳ full manual pass via the VS Code run task.
+- Tier 6 step 5 (offline export): ✅ automated 2026-06-13 (headless E2E, hard-offline reader context). Remaining Tier 6 steps + Tier 7 interactions: ⏳ manual pass via the VS Code run task.
+- Tier 7 partial: ✅ automated 2026-06-13 — Library generate (SDXL, real image rendered), Visual Dev variant generate + Lock → canonical + portrait in Bible, Publish panel-assign + export, all via the real UI.
 - Tier 9: ✅ build clean, no secrets in bundle.
 - Fix found via smoke: parent-injected `PORT` (e.g. preview=5173) collided with the companion server → made `server/.env` authoritative (`dotenv override:true`).

@@ -58,6 +58,26 @@ export inlines every assigned image and bakes in the scroll-reveal, producing a
 single self-contained file that opens with no internet. The size shown is the
 real file size; toggle **Downscale** to shrink it.
 
+## Create an episode from scratch (the whole loop)
+
+The end-to-end recipe, verified working with real generation (2026-06-13):
+
+1. **Series** → ＋ New series — title, logline, genre, palette, canon rules.
+2. **Narrative → Characters** → ＋ Add character — name, role, and an **Appearance**
+   description (this text drives the art).
+3. Click **"Develop ‹name›'s look in Visual Dev"** → the subject is created for you →
+   **✦ Generate variant** (pick Flux or SDXL) → **Lock canonical →** on the keeper.
+   The portrait appears back in the character's bible automatically.
+4. **Narrative → Seasons** → click the episode header to **name your episode** — this
+   names the export too.
+5. **Narrative → Script** → ＋ Add panel — write narration, **＋ Add dialogue** for
+   speaker lines (speakers come from your cast).
+6. **Production → Library** → generate scene/background art with a prompt.
+7. **Production → Compose** → select each panel → in the inspector, **assign art to
+   layers** (back → front) from the dropdown.
+8. **Production → Publish** → **⤓ Export offline comic (.html)** — the file lands in
+   your Downloads and opens anywhere, no internet needed.
+
 ## Tips
 - A character's LoRA + canonical image are the backbone of consistency — lock a
   canonical and train/assign a LoRA early, then everything else references them.
