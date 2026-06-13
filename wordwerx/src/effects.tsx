@@ -1,7 +1,21 @@
 import React from 'react';
 import { cx, fxColor } from './ui';
-import { EFFECT_TYPES, mkFx } from './data';
+import { EFFECT_TYPES, FX_PRESETS, mkFx } from './data';
 import { Scene } from './scenes';
+
+// One-click curated fx stacks; shared by all three effects-authoring UIs.
+export function PresetRow({ onPreset }: any) {
+  if (!onPreset) return null;
+  return (
+    <div className="ww-presetrow">
+      {FX_PRESETS.map(p => (
+        <button key={p.id} className="ww-preset" title={p.blurb} onClick={() => onPreset(p)}>
+          <span className="ww-preset-g">{p.glyph}</span>{p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ParamControl({ pkey, def, value, onChange }: any) {
   if (def.type === 'range') {
@@ -57,10 +71,11 @@ export function EffectEditor({ fx, onParam, onRemove, onToggle }: any) {
   );
 }
 
-export function AddEffectPalette({ onAdd }: any) {
+export function AddEffectPalette({ onAdd, onPreset }: any) {
   const [open, setOpen] = React.useState(false);
   return (
     <div className="ww-addfx">
+      <PresetRow onPreset={onPreset} />
       <button className="ww-addfx-btn" onClick={() => setOpen(o => !o)}>＋ Add effect</button>
       {open && (
         <div className="ww-addfx-grid">
@@ -79,7 +94,7 @@ export function AddEffectPalette({ onAdd }: any) {
   );
 }
 
-export function FxInspector({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle }: any) {
+export function FxInspector({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle, onPreset }: any) {
   return (
     <div className="ww-insp-fx">
       <div className="ww-insp-sub">Effects · {panel.fx.length}</div>
@@ -99,12 +114,12 @@ export function FxInspector({ panel, selFx, setSelFx, onParam, onAdd, onRemove, 
           </div>
         ))}
       </div>
-      <AddEffectPalette onAdd={onAdd} />
+      <AddEffectPalette onAdd={onAdd} onPreset={onPreset} />
     </div>
   );
 }
 
-export function FxTracks({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle }: any) {
+export function FxTracks({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle, onPreset }: any) {
   function pos(fx: any) {
     const trig = fx.params.Trigger || (fx.type === 'transition' ? 'On exit' : 'On enter');
     if (trig === 'On exit' || fx.type === 'transition') return [70, 96];
@@ -136,13 +151,13 @@ export function FxTracks({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onT
         })}
         <div className="ww-track-readline" />
       </div>
-      <AddEffectPalette onAdd={onAdd} />
+      <AddEffectPalette onAdd={onAdd} onPreset={onPreset} />
       {sel && <EffectEditor fx={sel} onParam={(k: string, v: any) => onParam(sel.id, k, v)} onRemove={() => onRemove(sel.id)} onToggle={() => onToggle(sel.id)} />}
     </div>
   );
 }
 
-export function FxStage({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle }: any) {
+export function FxStage({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onToggle, onPreset }: any) {
   const spots: Record<number, [number, number]> = { 0: [22, 24], 1: [74, 30], 2: [30, 70], 3: [78, 72], 4: [50, 50], 5: [50, 20], 6: [20, 50], 7: [80, 50] };
   const sel = panel.fx.find((f: any) => f.id === selFx);
   return (
@@ -170,7 +185,7 @@ export function FxStage({ panel, selFx, setSelFx, onParam, onAdd, onRemove, onTo
           </button>
         ))}
       </div>
-      <AddEffectPalette onAdd={onAdd} />
+      <AddEffectPalette onAdd={onAdd} onPreset={onPreset} />
       {sel && <EffectEditor fx={sel} onParam={(k: string, v: any) => onParam(sel.id, k, v)} onRemove={() => onRemove(sel.id)} onToggle={() => onToggle(sel.id)} />}
     </div>
   );

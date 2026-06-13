@@ -16,6 +16,7 @@ import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
 import { getBalance } from './services/runpod';
 import { getState, patchState, setLink as apiSetLink, getCatalogue, putCatalogue, type StoreLinks } from './services/store';
+import { useHistory, type ContentSnapshot } from './use-history';
 import { UIContext, useUIProvider, Lightbox } from './ui-context';
 
 const TWEAK_DEFAULTS = {
@@ -95,6 +96,23 @@ export default function App() {
   const setCharacters = (u: any) => setCharactersBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.characters) : u }));
   const setSeasons = (u: any) => setSeasonsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.seasons) : u }));
   const setArcs = (u: any) => setArcsBySeries(m => ({ ...m, [activeSeries]: typeof u === 'function' ? u(m[activeSeries] ?? content.arcs) : u }));
+
+  // Undo/redo over the per-series editable content (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y).
+  // Restoring writes through the series-scoped maps, so the debounced autosave
+  // below persists the restored state like any other edit.
+  const historySnapshot = React.useMemo<ContentSnapshot>(
+    () => ({ panels, library, characters, bible, seasons, arcs }),
+    [panels, library, characters, bible, seasons, arcs],
+  );
+  const restoreSnapshot = React.useCallback((snap: ContentSnapshot) => {
+    setPanelsBySeries(m => ({ ...m, [activeSeries]: snap.panels }));
+    setLibraryBySeries(m => ({ ...m, [activeSeries]: snap.library }));
+    setCharactersBySeries(m => ({ ...m, [activeSeries]: snap.characters }));
+    setBibleBySeries(m => ({ ...m, [activeSeries]: snap.bible }));
+    setSeasonsBySeries(m => ({ ...m, [activeSeries]: snap.seasons }));
+    setArcsBySeries(m => ({ ...m, [activeSeries]: snap.arcs }));
+  }, [activeSeries]);
+  useHistory(activeSeries, hydrated, historySnapshot, restoreSnapshot);
 
   // Append a blank character to the active series' cast; returns it so the caller can select it.
   function addCharacter() {
@@ -330,7 +348,7 @@ export default function App() {
               (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
               (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
               (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
-              (subs as any).production === 'preview' ? <Preview panels={panels} episode={episode} /> :
+              (subs as any).production === 'preview' ? <Preview panels={panels} episode={episode} links={links} /> :
               <Publish panels={panels} library={library} links={links} episode={episode} characters={characters} updateLink={updateLink} flash={flash} />
             )}
           </main>

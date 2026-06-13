@@ -5,7 +5,9 @@ import { Scene } from './scenes';
 import { GenerationPanel, type GenResult } from './components/GenerationPanel';
 import type { UseCase } from './workflows';
 import { assetUrl } from './services/store';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
+import { effectiveTextObjects, TextObjectStatic } from './text-objects';
 
 export function Library({ library, setLibrary, onUseAsset, online, flash, characters }: any) {
   const cast = characters || [];
@@ -107,6 +109,7 @@ export function Publish({ panels, links, flash, episode }: any) {
   const panelImage: Record<string, string> = links?.panelImage || {};
   const layerImage: Record<string, string> = links?.layerImage || {};
   const [downscale, setDownscale] = React.useState(true);
+  const [bakeMotion, setBakeMotion] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<{ bytes: number; withArt: number } | null>(null);
   const hasArt = (p: any) => panelImage[p.id] || (p.layers || []).some((_: any, i: number) => layerImage[`${p.id}:${i}`]);
@@ -115,8 +118,20 @@ export function Publish({ panels, links, flash, episode }: any) {
   async function exportComic() {
     setBusy(true);
     try {
-      const pp: PublishPanel[] = story.map((p: any, i: number) => ({ id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360, layers: p.layers?.length }));
-      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: episode.title, series: episode.series, panelImage, layerImage, downscale });
+      const fxOf = (p: any, type: string) => p.fx?.find((f: any) => f.type === type && f.on);
+      const pp: PublishPanel[] = story.map((p: any, i: number) => {
+        const reveal = fxOf(p, 'reveal'), par = fxOf(p, 'parallax'), trans = fxOf(p, 'transition');
+        return {
+          id: p.id, n: p.n, slug: p.slug, caption: p.caption, speaker: p.speaker, dialogue: p.dialogue, hue: (i * 41) % 360, gap: p.gap,
+          layers: (p.layers || []).map((l: any) => ({ depth: l.depth ?? 0 })),
+          reveal: reveal ? { motion: reveal.params.Motion, duration: reveal.params.Duration, distance: reveal.params.Distance, easing: reveal.params.Easing } : undefined,
+          parallax: par ? { strength: par.params.Strength, axis: par.params.Axis, anchor: par.params.Anchor } : undefined,
+          transition: trans ? { type: trans.params.Type } : undefined,
+          // same renderer as Compose/Preview — one source of truth for lettering
+          textHtml: effectiveTextObjects(p).map((t: any) => renderToStaticMarkup(<TextObjectStatic t={t} panel={p} />)).join('') || undefined,
+        };
+      });
+      const { html, bytes, withArt } = await buildEpisodeHtml(pp, { title: episode.title, series: episode.series, panelImage, layerImage, downscale, bakeMotion });
       downloadHtml(html, `${slug}.html`);
       setResult({ bytes, withArt });
       flash?.(`Exported offline comic · ${(bytes / 1e6).toFixed(2)} MB`);
@@ -137,6 +152,7 @@ export function Publish({ panels, links, flash, episode }: any) {
           <div><b>9:19</b><span>vertical</span></div>
         </div>
         <label className="ww-pub-opt"><input type="checkbox" checked={downscale} onChange={e => setDownscale(e.target.checked)} /><span><b>Downscale images</b> — re-encode to ≤1080px JPEG to keep the file small.</span></label>
+        <label className="ww-pub-opt"><input type="checkbox" checked={bakeMotion} onChange={e => setBakeMotion(e.target.checked)} /><span><b>Bake motion</b> — ship parallax, reveals and transitions in the file (respects readers' reduced-motion setting). Off = static scroll-reveal only.</span></label>
         <button className={cx('ww-pub-go', busy && 'is-done')} disabled={busy} onClick={exportComic}>{busy ? 'Exporting…' : '⤓ Export offline comic (.html)'}</button>
         {result && (
           <div className="ww-pub-link">

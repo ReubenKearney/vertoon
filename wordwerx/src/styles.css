@@ -107,6 +107,9 @@ input,textarea,select{font-family:inherit;color:inherit;}
 .ww-seqitem{display:flex;align-items:center;gap:9px;padding:7px;border-radius:9px;cursor:pointer;position:relative;transition:.14s;}
 .ww-seqitem:hover{background:var(--bg3);}
 .ww-seqitem.is-sel{background:var(--bg3);box-shadow:inset 0 0 0 1px var(--accent);}
+.ww-seqitem.is-dragging{opacity:.45;}
+.ww-seqitem.is-dragover{box-shadow:inset 0 0 0 1px var(--accent);}
+.ww-seqitem.is-dragover::before{content:"";position:absolute;left:6px;right:6px;top:-3px;height:2px;border-radius:2px;background:var(--accent);}
 .ww-seq-n{font-family:var(--font-mono);font-size:10px;color:var(--ink3);width:16px;}
 .ww-seq-mini{width:38px;height:50px;border-radius:5px;overflow:hidden;position:relative;flex-shrink:0;background:#06070c;box-shadow:inset 0 0 0 1px var(--line);}
 .ww-seq-meta{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3;}
@@ -147,6 +150,63 @@ input,textarea,select{font-family:inherit;color:inherit;}
 .ww-pcard-fx{position:absolute;left:10px;right:10px;bottom:9px;display:flex;flex-wrap:wrap;gap:4px;}
 .ww-pcard-fx .ww-chip{height:19px;padding:0 5px;backdrop-filter:blur(6px);background:color-mix(in oklab,var(--fx,#888) 24%,rgba(8,10,16,.6));}
 .ww-strip-end{text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--ink3);padding:20px;letter-spacing:.1em;}
+
+/* gutter strip — the authored whitespace after a panel, made legible when selected */
+.ww-gapstrip{margin-left:76px;width:800px;position:relative;}
+.ww-gapstrip.is-sel{background:repeating-linear-gradient(-45deg,transparent,transparent 9px,color-mix(in oklab,var(--accent) 14%,transparent) 9px,color-mix(in oklab,var(--accent) 14%,transparent) 10px);
+  box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--accent) 30%,transparent);}
+.ww-gapstrip span{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:color-mix(in oklab,var(--accent) 80%,#fff);background:var(--bg);padding:2px 7px;border-radius:4px;}
+
+/* fx presets — one-click curated stacks */
+.ww-presetrow{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.ww-preset{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:99px;font-size:10.5px;font-weight:600;
+  color:var(--ink2);background:var(--bg3);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;transition:.14s;}
+.ww-preset:hover{color:var(--ink);box-shadow:inset 0 0 0 1px var(--accent);}
+.ww-preset-g{font-size:11px;color:var(--accent);}
+
+/* text-object editor chrome (Compose only; render styles live in TEXT_OBJECT_CSS) */
+/* the shared static .ww-to is position:absolute; inside the editable wrapper we
+   float it back into flow so the wrapper takes the object's real height — needed
+   for the selection outline + a non-zero hit area */
+.ww-to-edit .ww-to{position:relative;left:0;top:0;width:100%;}
+.ww-to-edit{cursor:grab;touch-action:none;user-select:none;}
+.ww-to-edit:hover{outline:1px dashed color-mix(in oklab,var(--accent) 45%,transparent);outline-offset:3px;}
+.ww-to-edit.is-to-sel{outline:1.5px dashed color-mix(in oklab,var(--accent) 85%,transparent);outline-offset:3px;}
+.ww-to-handle{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px #fff,0 1px 6px rgba(0,0,0,.55);z-index:7;touch-action:none;}
+.ww-to-handle-w{right:-8px;top:50%;transform:translateY(-50%);cursor:ew-resize;}
+.ww-to-handle-tail{left:50%;bottom:-22px;transform:translateX(-50%);cursor:move;border-radius:3px;}
+.ww-to-editfield{outline:none;display:block;min-width:40px;cursor:text;user-select:text;}
+/* inspector text list */
+.ww-tolist{display:grid;gap:6px;margin-bottom:14px;}
+.ww-toitem{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:8px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer;}
+.ww-toitem.is-sel{box-shadow:inset 0 0 0 1px var(--accent);}
+.ww-toitem-kind{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.1em;color:var(--ink3);background:var(--bg3);padding:3px 5px;border-radius:4px;flex-shrink:0;}
+.ww-toitem-snippet{flex:1;min-width:0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink2);}
+.ww-toitem-delivery{height:24px;font-size:10px;max-width:92px;flex-shrink:0;}
+.ww-toitem-sfxctl{display:flex;flex-direction:column;gap:2px;width:72px;flex-shrink:0;}
+.ww-toitem-sfxctl input[type=range]{width:100%;height:10px;accent-color:var(--accent);}
+
+/* motion scrubber — plays the selected panel's scroll pass inside Compose */
+.ww-scrubbar{margin:6px 0 10px 76px;width:800px;display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:10px;
+  background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);}
+.ww-scrubbar.is-on{box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--accent) 55%,transparent);}
+.ww-scrubbar input[type=range]{flex:1;accent-color:var(--accent);}
+.ww-scrub-play{width:26px;height:26px;border-radius:7px;background:var(--bg3);color:var(--ink);border:none;cursor:pointer;font-size:10px;flex-shrink:0;}
+.ww-scrub-play:hover{background:var(--raise);}
+.ww-scrub-label{font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);min-width:86px;text-align:right;}
+.ww-scrubbar.is-on .ww-scrub-label{color:color-mix(in oklab,var(--accent) 80%,#fff);}
+.ww-scrub-reset{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:11px;flex-shrink:0;}
+.ww-scrub-reset:hover{color:var(--ink);}
+.ww-cinema-stage .ww-scrubbar{margin:10px auto 0;width:calc(min(74vh,900px) * 0.625);max-width:100%;}
+
+/* gutter control (inspector) */
+.ww-gutterctl{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center;margin-bottom:14px;}
+.ww-gutterctl input[type=range]{width:100%;accent-color:var(--accent);}
+.ww-gutterctl-v{font-family:var(--font-mono);font-size:10px;color:var(--ink2);min-width:38px;text-align:right;}
+.ww-gutterctl-presets{grid-column:1/-1;display:flex;gap:5px;}
+.ww-gutterctl-presets .ww-filter{flex:1;font-size:10.5px;}
+.ww-gutterctl-presets .ww-filter.is-on{box-shadow:inset 0 0 0 1px var(--accent);color:var(--ink);}
 
 /* board */
 .ww-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px;padding:32px;}

@@ -1,5 +1,72 @@
 # WORDWERX — backlog
 
+## ✅ Done — Vertoon-crafting UX overhaul (webtoon conventions + dynamic-feature impact) — 2026-06-13
+Branch `feat/vertoon-ux-overhaul`. Made the crafting UX intuitive by (a) supporting the main webtoon
+layout/design conventions and (b) making vertoon's dynamic features visible and discoverable. Seven
+shippable phases, all built clean (`npm run build`) and verified end-to-end in a headless-Chrome
+drive of the live app (23/23 checks): undo/redo, drag-reorder, gutter, real art in Preview + scrubber,
+on-canvas text, presets, baked-motion export — each confirmed in Compose, Preview, **and** the offline
+`.html` export.
+
+### What shipped
+1. **On-canvas text objects** (`src/text-objects.tsx`) — speech bubbles, captions, SFX placed/dragged/
+   resized on the panel, with a tail handle and delivery-driven visual variants (Shouted → jagged,
+   Whispered → dashed/faded, Thought → cloud+dots, Voice-over → squared box). Dialogue/caption objects
+   are **placement records only**; their text always reads from `panel.dialogue`/`panel.caption`, so the
+   Script tab stays the single writing surface and the two can't diverge. Extra balloons + SFX own their
+   text. One hook-free renderer (`TextObjectStatic`) + one stylesheet (`TEXT_OBJECT_CSS`) drive Compose,
+   Preview, and the export — the export uses `renderToStaticMarkup` (`react-dom` was already a dep).
+2. **Undo/redo** (`src/use-history.ts`) — `Ctrl+Z`/`Ctrl+Shift+Z`/`Ctrl+Y`, per-series, change-grouped
+   (~500 ms) so typing isn't undone per keystroke, and **skipped inside text fields** so native field
+   undo still works. Restores through the existing per-series setters → the 600 ms autosave persists it.
+3. **Drag-and-drop reordering** — panels (sequence rail) and layers (grip handles), native HTML5 DnD,
+   no new deps. ▴▾ buttons kept as a keyboard fallback.
+4. **Per-panel gutter** (`panel.gap`) — the core webtoon pacing/whitespace tool, honored identically in
+   the Compose filmstrip (hatched strip when selected), Preview, and the export.
+5. **Real layer art in Preview + in-Compose scrubber** (`src/panel-art.tsx`) — see gotcha #1. `ScrubBar`
+   replays a panel's reveal/parallax/transition without leaving Compose, reusing `parallaxOffset`.
+6. **Effect presets** (`FX_PRESETS` in `data.ts`, `PresetRow` in `effects.tsx`) — one-click curated fx
+   stacks; applying replaces existing fx of the same types (no duplicate stacks).
+7. **Baked motion in the export** — parallax + reveals + transitions now ship in the offline `.html`
+   (previously only a fixed fade), behind a "Bake motion" toggle (default on) and a
+   `prefers-reduced-motion` guard. Tap + pacing deliberately **not** baked (tap payload is demo-only;
+   scroll-lock pacing fights an arbitrary reader's native scroll).
+
+### Data model (backward-compatible, zero server changes)
+New panel fields `gap?` and `textObjects?` are both optional. The server PATCH treats `state.panels`
+as opaque, so nothing server-side changed; backward compatibility is pure client-side defaulting via
+`effectiveTextObjects(panel)`, which materialises default-positioned bubbles from the dialogue/caption
+fields for any panel that has never been touched. A pre-existing Echo series hydrates unchanged.
+
+### Gotchas / lessons learnt
+- **Preview never showed the user's art.** It rendered only procedural `<Scene>` placeholders and
+  wasn't even passed `links` — so parallax, the flagship feature, was literally invisible on real
+  artwork everywhere except the flat Compose thumbnail. `PanelArt` + threading `links` into `<Preview>`
+  was a hidden prerequisite for both the scrubber (5) and the baked export (7).
+- **Layer art is keyed by index** (`links.layerImage["{panelId}:{i}"]`). Any layer reorder *or delete*
+  must remap those keys or art jumps between layers — the **delete case was a pre-existing live bug**
+  (deleting a middle layer orphaned/shifted assignments). Both fixed via `syncLayerLinks`.
+- **The editable text wrapper collapsed to zero height.** The shared static `.ww-to` is
+  `position:absolute`, so the `.ww-to-edit` wrapper had no in-flow content → its selection outline and
+  hit area were a zero-height box. Drag still *worked* (DOM event bubbling ignores layout), which is why
+  it was easy to miss. Fixed editor-only: `.ww-to-edit .ww-to{position:relative}` — the static surfaces
+  (Preview/export) keep absolute positioning untouched.
+- **`TextObjectStatic` must stay hook-free** so `renderToStaticMarkup` can reuse it in the export.
+  Only the editable wrapper uses state/refs.
+- **Parallax math is duplicated** in the export's vanilla rAF loop (no React in the `.html`). It's
+  ported verbatim from `preview-engine.ts` and both copies carry a "keep in sync" comment.
+- **Verification gotchas** (for the next headless drive): clicking a panel card that has assigned art
+  opens the zoom **lightbox**, which then intercepts later clicks — select panels via the `.ww-seqitem`
+  rail instead. Post-reload **hydration is async** (a `getState` round-trip), so wait for real art to
+  appear rather than a fixed sleep, or the check races the pre-hydration registry seed.
+
+### Known cosmetic follow-ups (not blockers)
+- Bubble rotation / free-transform, canvas zoom, snapping guides, and multi-select are out of scope.
+- Sound effects still have no audio playback (no audio assets exist) — markers only.
+- The new code follows the repo's existing `any` convention (lint debt below).
+
+---
+
 ## ✅ Done — Per-series workbench (create + drive a blank series) — 2026-06-10
 Branch `feat/per-series-workbench`. The app is no longer hardcoded to the seed series
 **"Echo's Location"**; any series — including a brand-new blank one — drives the whole

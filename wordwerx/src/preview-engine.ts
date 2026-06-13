@@ -22,7 +22,8 @@ export function mapEasing(e: string) {
 }
 
 // per-axis parallax offset for a panel, given the smoothed scroll position pv
-function parallaxOffset(p: any, pv: number): { px: number; py: number } {
+// (exported so the Compose scrubber and Publish bake share the exact math)
+export function parallaxOffset(p: any, pv: number): { px: number; py: number } {
   const f = p.fx.find((x: any) => x.type === 'parallax' && x.on);
   const axis = f ? f.params.Axis : 'Vertical';
   const anchor = f ? f.params.Anchor : 'Center';

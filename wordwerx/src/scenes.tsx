@@ -178,7 +178,7 @@ export const SCENES: Record<string, () => React.ReactElement> = {
 
 // A continuous ambient loop overlay. Density (0-100) drives intensity/coverage;
 // Speed (×) drives animation rate (faster = shorter duration).
-function LoopOverlay({ kind, density = 55, speed = 1 }: any) {
+export function LoopOverlay({ kind, density = 55, speed = 1 }: any) {
   const d = density / 100;
   const dur = (base: number) => (base / Math.max(0.2, speed)) + 's';
   switch (kind) {
@@ -199,21 +199,28 @@ function LoopOverlay({ kind, density = 55, speed = 1 }: any) {
   }
 }
 
+// Wire every [data-d] descendant to the --px/--py parallax vars the preview
+// engine (and the Compose scrubber) set on the .ww-scene root. Idempotent —
+// safe to re-run when depths change.
+export function applyDepthTransforms(root: HTMLElement) {
+  root.querySelectorAll('[data-d]').forEach((el: any) => {
+    const d = parseFloat(el.getAttribute('data-d')) || 0;
+    el.style.setProperty('--d', String(d * 74));
+    if (el.dataset.wwInit) return;
+    el.style.willChange = 'transform';
+    const base = el.style.transform && !el.style.transform.includes('var(') ? el.style.transform : '';
+    el.style.transform = `translate3d(calc(var(--px,0) * var(--d,0) * 1px), calc(var(--py,0) * var(--d,0) * 1px), 0) ${base}`;
+    el.dataset.wwInit = '1';
+  });
+}
+
 export function Scene({ kind, py = 0, strength = 0, loop = null, loopDensity = 55, loopSpeed = 1, className = '', style = {} }: any) {
   React.useEffect(injectSceneCss, []);
   const ref = React.useRef<HTMLDivElement>(null);
   const Builder = SCENES[kind] || SCENES.dusk_skyline;
   React.useEffect(() => {
     const root = ref.current; if (!root) return;
-    root.querySelectorAll('[data-d]').forEach((el: any) => {
-      if (el.dataset.wwInit) return;
-      const d = parseFloat(el.getAttribute('data-d')) || 0;
-      el.style.willChange = 'transform';
-      const base = el.style.transform && !el.style.transform.includes('var(') ? el.style.transform : '';
-      el.style.setProperty('--d', String(d * 74));
-      el.style.transform = `translate3d(calc(var(--px,0) * var(--d,0) * 1px), calc(var(--py,0) * var(--d,0) * 1px), 0) ${base}`;
-      el.dataset.wwInit = '1';
-    });
+    applyDepthTransforms(root);
     root.style.setProperty('--p', String(py * strength));
   }, [py, strength, Builder]);
   return (
