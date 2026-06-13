@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
 import { effectiveTextObjects, TextObjectStatic } from './text-objects';
 
-export function Library({ library, setLibrary, onUseAsset, online, flash, characters }: any) {
+export function Library({ library, setLibrary, onUseAsset, online, flash, characters, seriesLora }: any) {
   const cast = characters || [];
   const [filter, setFilter] = React.useState('All');
   const [pending, setPending] = React.useState(0);
@@ -30,7 +30,7 @@ export function Library({ library, setLibrary, onUseAsset, online, flash, charac
     <div className="ww-library">
       <GenerationPanel
         workflows={['txt2img-flux', 'txt2img-sdxl', 'dataset-batch']}
-        showLora online={online} flash={flash} onResult={onResult} onPending={setPending}
+        showLora seriesLora={seriesLora} online={online} flash={flash} onResult={onResult} onPending={setPending}
       />
       <div className="ww-lib-bar">
         <div className="ww-filters">{kinds.map(k => <button key={k} className={cx('ww-filter', filter === k && 'is-on')} onClick={() => setFilter(k)}>{k}</button>)}</div>

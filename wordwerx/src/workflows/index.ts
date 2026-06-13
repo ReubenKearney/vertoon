@@ -23,10 +23,23 @@ interface BaseParams {
   width?: number;
   height?: number;
   steps?: number;
-  lora?: LoraRef;
+  lora?: LoraRef;        // legacy single LoRA (kept for back-compat)
+  loras?: LoraRef[];     // stacked LoRAs, applied in order (base first, on top last)
 }
 
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
+
+// Normalize the legacy single `lora` + new `loras[]` into one ordered stack,
+// dropping blank names (an empty lora_name 500s at ComfyUI queue validation).
+function loraStack(p: { lora?: LoraRef; loras?: LoraRef[] }): LoraRef[] {
+  return (p.loras ?? (p.lora ? [p.lora] : [])).filter(l => l && l.name && l.name.trim());
+}
+
+// Next free integer node id, so injected loaders never overwrite a base node
+// (even if a builder's base graph grows later).
+function nextId(g: Record<string, unknown>): number {
+  return Math.max(0, ...Object.keys(g).map(Number).filter(Number.isFinite)) + 1;
+}
 
 // --- Flux txt2img -------------------------------------------------------------
 export function txt2imgFlux(p: BaseParams): Record<string, any> {
@@ -43,9 +56,20 @@ export function txt2imgFlux(p: BaseParams): Record<string, any> {
     '18': { class_type: 'VAEDecode', inputs: { samples: ['17', 0], vae: ['12', 0] } },
     '19': { class_type: 'SaveImage', inputs: { images: ['18', 0], filename_prefix: 'wordwerx' } },
   };
-  if (p.lora) {
-    g['20'] = { class_type: 'LoraLoaderModelOnly', inputs: { model: ['10', 0], lora_name: p.lora.name, strength_model: p.lora.strength ?? 0.9 } };
-    g['17'].inputs.model = ['20', 0];
+  // Stack LoRAs as a chain of model-only loaders. In-app LoRAs are Flux
+  // transformer-only (FluxTrainer trains the UNet, no text encoder), so
+  // LoraLoaderModelOnly is correct — the concept rides the trigger word in the
+  // T5 prompt. The KSampler reads the top of the stack.
+  const fluxStack = loraStack(p);
+  if (fluxStack.length) {
+    let modelRef: [string, number] = ['10', 0];   // UNETLoader output
+    let id = nextId(g);
+    for (const l of fluxStack) {
+      const nid = String(id++);
+      g[nid] = { class_type: 'LoraLoaderModelOnly', inputs: { model: modelRef, lora_name: l.name, strength_model: l.strength ?? 0.9 } };
+      modelRef = [nid, 0];
+    }
+    g['17'].inputs.model = modelRef;
   }
   return g;
 }
@@ -62,11 +86,22 @@ export function txt2imgSDXL(p: BaseParams): Record<string, any> {
     '6': { class_type: 'VAEDecode', inputs: { samples: ['5', 0], vae: ['1', 2] } },
     '7': { class_type: 'SaveImage', inputs: { images: ['6', 0], filename_prefix: 'wordwerx' } },
   };
-  if (p.lora) {
-    g['8'] = { class_type: 'LoraLoader', inputs: { model: ['1', 0], clip: ['1', 1], lora_name: p.lora.name, strength_model: p.lora.strength ?? 0.9, strength_clip: p.lora.strength ?? 0.9 } };
-    g['5'].inputs.model = ['8', 0];
-    g['2'].inputs.clip = ['8', 1];
-    g['3'].inputs.clip = ['8', 1];
+  // SDXL LoRAs carry CLIP weights, so chain model + clip through each loader and
+  // repoint both CLIPTextEncode nodes to the final clip after the loop.
+  const sdxlStack = loraStack(p);
+  if (sdxlStack.length) {
+    let modelRef: [string, number] = ['1', 0];   // checkpoint model
+    let clipRef: [string, number] = ['1', 1];    // checkpoint clip
+    let id = nextId(g);
+    for (const l of sdxlStack) {
+      const nid = String(id++);
+      g[nid] = { class_type: 'LoraLoader', inputs: { model: modelRef, clip: clipRef, lora_name: l.name, strength_model: l.strength ?? 0.9, strength_clip: l.strength ?? 0.9 } };
+      modelRef = [nid, 0];
+      clipRef = [nid, 1];
+    }
+    g['5'].inputs.model = modelRef;
+    g['2'].inputs.clip = clipRef;
+    g['3'].inputs.clip = clipRef;
   }
   return g;
 }
@@ -81,9 +116,9 @@ export function datasetBatch(p: BaseParams & { count?: number }): Record<string,
 
 // --- Flux img2img (re-frame / variation of a reference at a given strength) ---
 // denoise low (~0.4) = close to source; high (~0.8) = freer re-interpretation.
-export function img2imgFlux(p: { refImageName: string; positive: string; denoise?: number; steps?: number; seed?: number }): Record<string, any> {
+export function img2imgFlux(p: { refImageName: string; positive: string; denoise?: number; steps?: number; seed?: number; lora?: LoraRef; loras?: LoraRef[] }): Record<string, any> {
   const seed = p.seed ?? rnd();
-  return {
+  const g: Record<string, any> = {
     '1': { class_type: 'LoadImage', inputs: { image: p.refImageName } },
     '10': { class_type: 'UNETLoader', inputs: { unet_name: 'flux1-dev.safetensors', weight_dtype: 'default' } },
     '11': { class_type: 'DualCLIPLoader', inputs: { clip_name1: 't5xxl_fp16.safetensors', clip_name2: 'clip_l.safetensors', type: 'flux' } },
@@ -96,6 +131,18 @@ export function img2imgFlux(p: { refImageName: string; positive: string; denoise
     '18': { class_type: 'VAEDecode', inputs: { samples: ['17', 0], vae: ['12', 0] } },
     '19': { class_type: 'SaveImage', inputs: { images: ['18', 0], filename_prefix: 'wordwerx_reangle' } },
   };
+  const stack = loraStack(p);
+  if (stack.length) {
+    let modelRef: [string, number] = ['10', 0];
+    let id = nextId(g);
+    for (const l of stack) {
+      const nid = String(id++);
+      g[nid] = { class_type: 'LoraLoaderModelOnly', inputs: { model: modelRef, lora_name: l.name, strength_model: l.strength ?? 0.9 } };
+      modelRef = [nid, 0];
+    }
+    g['17'].inputs.model = modelRef;
+  }
+  return g;
 }
 
 // --- Expression edit (Flux Kontext: ref image + instruction) ------------------

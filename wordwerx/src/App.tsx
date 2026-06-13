@@ -15,7 +15,7 @@ import { VisualDev } from './visdev';
 import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
 import { getBalance } from './services/runpod';
-import { getState, patchState, setLink as apiSetLink, getCatalogue, putCatalogue, type StoreLinks } from './services/store';
+import { getState, patchState, setLink as apiSetLink, setSeriesLora as apiSetSeriesLora, getCatalogue, putCatalogue, type StoreLinks } from './services/store';
 import { useHistory, type ContentSnapshot } from './use-history';
 import { UIContext, useUIProvider, Lightbox } from './ui-context';
 
@@ -204,6 +204,12 @@ export default function App() {
     setLinks(l => (l ? { ...l, [category]: { ...(l as any)[category], [key]: value } } : l));
     apiSetLink(activeSeries, category, key, value).catch(() => {});
   }
+  // Set (or clear with null) the series-default style LoRA — full replace, not the
+  // Record-shaped updateLink (seriesLora is a singular object per series).
+  function updateSeriesLora(value: StoreLinks['seriesLora'] | null) {
+    setLinks(l => (l ? { ...l, seriesLora: value ?? undefined } : l));
+    apiSetSeriesLora(activeSeries, value).catch(() => {});
+  }
   // Persist + reflect a character's appearance text for the active series.
   function updateAppearance(charId: string, text: string) {
     setAppearance(a => {
@@ -341,12 +347,12 @@ export default function App() {
           <main className="ww-stage">
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
-            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} characters={characters} flash={flash} updateLink={updateLink} />}
+            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} seriesId={activeSeries} characters={characters} flash={flash} updateLink={updateLink} seriesLora={links?.seriesLora} updateSeriesLora={updateSeriesLora} />}
             {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
             {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
               (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
-              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} /> :
+              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} seriesLora={links?.seriesLora} /> :
               (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
               (subs as any).production === 'preview' ? <Preview panels={panels} episode={episode} links={links} /> :
               <Publish panels={panels} library={library} links={links} episode={episode} characters={characters} updateLink={updateLink} flash={flash} />
