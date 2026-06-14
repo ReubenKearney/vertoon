@@ -45,12 +45,15 @@ function seriesDirs(): string[] {
   });
 }
 
-function loadSeries(series: string): SeriesLore {
+export function loadSeries(series: string): SeriesLore {
   const dir = join(LORE_ROOT, series);
   const byId = new Map<string, LoreEntity>();
   const all: LoreEntity[] = [];
 
-  for (const file of walk(dir)) {
+  // A series with no lore folder yet is valid — it just has no entities.
+  let files: string[] = [];
+  try { files = walk(dir); } catch { files = []; }
+  for (const file of files) {
     const rel = relative(LORE_ROOT, file).split(sep).join('/');
     const raw = readFileSync(file, 'utf8');
     const parsed = matter(raw);
@@ -71,7 +74,11 @@ function loadSeries(series: string): SeriesLore {
       );
     }
 
-    const entity: LoreEntity = { data, body: parsed.content.trim(), series, file: rel };
+    // Normalize CRLF -> LF so the generated bundle/consolidated docs are
+    // identical regardless of the platform `lore:gen` runs on (Windows checkouts
+    // are CRLF; without this the body strings churn between LF and CRLF).
+    const body = parsed.content.replace(/\r\n/g, '\n').trim();
+    const entity: LoreEntity = { data, body, series, file: rel };
     byId.set(data.id, entity);
     all.push(entity);
   }

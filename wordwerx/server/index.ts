@@ -14,6 +14,7 @@ import { submitRun, getStatus, cancelJob, getBalance } from './runpod.js';
 import { listLoras, uploadLora, uploadTrainingImage, deleteLora } from './loras.js';
 import { buildTrainWorkflow } from './train-workflow.js';
 import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, setSeriesLora, isLinkKey, assetCount, getCatalogue, setCatalogue } from './store.js';
+import { listLore, upsertLore, removeLore } from '../lore/_store.js';
 
 const app = express();
 // Larger limit: /api/assets receives base64 images.
@@ -94,6 +95,29 @@ app.post('/api/series-lora', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// --- Lore (per-series world repository; markdown files are the source of truth)
+// CRUD writes the lore/<series>/**/*.md files, re-validates with the zod schema,
+// and regenerates src/lore.generated.ts. All routes are per-series via ?series=.
+app.get('/api/lore', wrap(async (req, res) => { res.json({ entities: listLore(seriesOf(req)) }); }));
+
+// Create. Body: { data: <frontmatter object>, body: <prose markdown> }
+app.post('/api/lore', wrap(async (req, res) => {
+  const { data, body } = req.body || {};
+  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'data object is required' });
+  res.json({ entities: upsertLore(seriesOf(req), data, body || '') });
+}));
+
+// Update (may rename id / change type, moving the file). Body as POST.
+app.put('/api/lore/:id', wrap(async (req, res) => {
+  const { data, body } = req.body || {};
+  if (!data || typeof data !== 'object') return res.status(400).json({ error: 'data object is required' });
+  res.json({ entities: upsertLore(seriesOf(req), data, body || '', req.params.id) });
+}));
+
+app.delete('/api/lore/:id', wrap(async (req, res) => {
+  res.json({ entities: removeLore(seriesOf(req), req.params.id) });
+}));
+
 // --- Generation --------------------------------------------------------------
 // Body: { workflow, images? } -> { jobId }
 app.post('/api/generate', wrap(async (req, res) => {
@@ -151,7 +175,8 @@ app.post('/api/loras/train', upload.array('images', 200), wrap(async (req, res) 
 // --- Error handler -----------------------------------------------------------
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[server]', err?.message || err);
-  res.status(500).json({ error: String(err?.message || err) });
+  // Errors may carry a status (e.g. lore validation 400 / conflict 409); default 500.
+  res.status(typeof err?.status === 'number' ? err.status : 500).json({ error: String(err?.message || err) });
 });
 
 const port = Number(process.env.PORT) || 8787;

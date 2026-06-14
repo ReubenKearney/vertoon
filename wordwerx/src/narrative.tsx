@@ -5,9 +5,12 @@ import { mkFx } from './data';
 import { Scene } from './scenes';
 import { assetUrl } from './services/store';
 import { useUI } from './ui-context';
+import { LoreView } from './lore';
+import { seriesLore } from './lore.generated';
 
 const NARR_TABS = [
   { id: 'cast', label: 'Characters', glyph: '☺' },
+  { id: 'lore', label: 'Lore', glyph: '◇' },
   { id: 'arcs', label: 'Seasons', glyph: '⤳' },
   { id: 'beats', label: 'Storyboard', glyph: '≡' },
   { id: 'script', label: 'Script', glyph: '¶' },
@@ -16,9 +19,9 @@ const NARR_TABS = [
 function charAvatar(tint: number) { return { background: `radial-gradient(78% 78% at 50% 28%, oklch(0.55 0.14 ${tint}), #0a0c12 78%)` }; }
 function storyPanels(panels: any[]) { return panels.filter(p => p.scene !== 'parallax_demo'); }
 
-export function Narrative({ characters, addCharacter, updateCharacter, seasons, setSeasons, arcs, setArcs, bible, updateBible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
+export function Narrative({ seriesId, characters, addCharacter, updateCharacter, seasons, setSeasons, arcs, setArcs, bible, updateBible, panels, setPanels, episode, tab, setTab, onGoVisual, online, links, appearance, updateAppearance, updateLink, flash }: any) {
   const counts = {
-    cast: characters.length, arcs: arcs.length,
+    cast: characters.length, lore: (seriesLore(seriesId) || []).length, arcs: arcs.length,
     beats: storyPanels(panels).length, script: storyPanels(panels).length,
   };
   return (
@@ -33,6 +36,7 @@ export function Narrative({ characters, addCharacter, updateCharacter, seasons, 
       </div>
       <div className="ww-narr-body">
         {tab === 'cast' && <Bible characters={characters} bible={bible} addCharacter={addCharacter} updateCharacter={updateCharacter} updateBible={updateBible} onGoVisual={onGoVisual} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+        {tab === 'lore' && <LoreView seriesId={seriesId} online={online} flash={flash} />}
         {tab === 'arcs' && <ArcBoard seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} />}
         {tab === 'beats' && <BeatSheet panels={panels} setPanels={setPanels} episode={episode} />}
         {tab === 'script' && <ScriptEditor panels={panels} setPanels={setPanels} episode={episode} characters={characters} />}

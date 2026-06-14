@@ -31,7 +31,7 @@ const TWEAK_DEFAULTS = {
 const NAV = [
   { id: 'series', label: 'Series', glyph: '◈', single: true, children: null },
   { id: 'narrative', label: 'Narrative', glyph: '✎', single: false, children: [
-    { id: 'cast', label: 'Characters' }, { id: 'arcs', label: 'Seasons' }, { id: 'beats', label: 'Storyboard' }, { id: 'script', label: 'Script' },
+    { id: 'cast', label: 'Characters' }, { id: 'lore', label: 'Lore' }, { id: 'arcs', label: 'Seasons' }, { id: 'beats', label: 'Storyboard' }, { id: 'script', label: 'Script' },
   ]},
   { id: 'visual', label: 'Visual Dev', glyph: '◎', single: false, children: [
     { id: 'board', label: 'Prototype board' }, { id: 'sheets', label: 'Model sheets' }, { id: 'locations', label: 'Locations' }, { id: 'loras', label: 'LoRAs' },
@@ -348,7 +348,7 @@ export default function App() {
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
             {/* LoRA manager is cross-series — render it for any active series. */}
             {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} seriesId={activeSeries} characters={characters} flash={flash} updateLink={updateLink} seriesLora={links?.seriesLora} updateSeriesLora={updateSeriesLora} />}
-            {ws === 'narrative' && <Narrative key={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
+            {ws === 'narrative' && <Narrative key={activeSeries} seriesId={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
             {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
               (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
