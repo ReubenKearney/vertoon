@@ -1,17 +1,6 @@
 import React from 'react';
 import { cx } from './ui';
-import { Scene } from './scenes';
-
-const GENRES = ['Sci-fi mystery', 'Folk-horror', 'Neon-noir', 'Cozy mystery', 'Solarpunk', 'Fantasy', 'Slice of life'];
-const FORMATS = ['Vertical scroll · vertoon', 'Paged · landscape', 'Paged · portrait'];
-const POVS = ['Single POV per episode', 'Rotating ensemble', 'First-person', 'Omniscient'];
-const STARTER_PALS = [
-  ['#1a2740', '#9a5a4e', '#16d6b4', '#caa07a'],
-  ['#0d1f24', '#1c3a3f', '#5a7d6e', '#cbb894'],
-  ['#120a1f', '#3a1145', '#ff2e88', '#34e0ff'],
-  ['#1a1710', '#3a2f1a', '#e0b552', '#9ad1c4'],
-];
-const COVER_SCENES = ['dusk_skyline', 'tunnels', 'night_lockdown', 'lantern_hub', 'echo_call', 'rescue'];
+import { SeriesCover } from './scenes';
 
 function statusHue(s: string) {
   return ({ 'In production': 285, 'Drafting': 175, 'Visual dev': 330, 'Outlining': 60 } as any)[s] || 280;
@@ -26,17 +15,25 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, charact
     const id = 'sx' + Math.random().toString(36).slice(2, 6);
     const ns = {
       id, title: data.title || 'Untitled Series', genre: data.genre, tagline: data.tagline,
-      status: 'Outlining', hue: statusHue('Outlining'), cover: data.cover, format: data.format,
+      status: 'Outlining', hue: statusHue('Outlining'), cover: '', // cover is assigned later from the Production Library
       seasons: 1, episodes: 0, published: 0, panels: 0, progress: 0,
-      palette: data.palette, styleKey: data.styleKey || 'Untitled key', pov: data.pov,
-      updated: 'Just now', canon: data.canon.split('\n').map((s: string) => s.trim()).filter(Boolean),
+      updated: 'Just now',
     };
     setSeries((s: any[]) => [ns, ...s]);
     setCreating(false);
-    flash('"' + ns.title + '" created · ' + ns.genre);
+    flash('"' + ns.title + '" created' + (ns.genre ? ' · ' + ns.genre : ''));
     // Make the new (blank) series active and drop into its Narrative workspace.
     setActive(ns.id);
     onOpen(ns);
+  }
+
+  function deleteSeries(target: any) {
+    if (series.length <= 1) { flash('Can’t delete the only series.'); return; }
+    if (!window.confirm(`Delete “${target.title}”? This permanently removes the series and its setup.`)) return;
+    setSeries((list: any[]) => list.filter((x: any) => x.id !== target.id));
+    if (target.id === activeId) { const next = series.find((x: any) => x.id !== target.id); if (next) setActive(next.id); }
+    setCfgId(null);
+    flash('Deleted · ' + target.title);
   }
 
   return (
@@ -54,7 +51,7 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, charact
         {series.map((s: any) => (
           <div key={s.id} className={cx('ww-scard', s.id === activeId && 'is-active')} style={{ '--sh': `oklch(0.7 0.16 ${s.hue})` } as any}>
             <div className="ww-scard-cover">
-              <Scene kind={s.cover} />
+              <SeriesCover cover={s.cover} />
               <div className="ww-scard-grad" />
               <div className="ww-scard-badge"><i />{s.status}</div>
               {s.id === activeId && <div className="ww-scard-active-tag">● Active</div>}
@@ -81,23 +78,20 @@ export function Series({ series, setSeries, activeId, setActive, onOpen, charact
             </div>
           </div>
         ))}
-        <button className="ww-scard-new" onClick={() => setCreating(true)}><b>＋</b><span>New series</span></button>
       </div>
 
       {creating && <NewSeriesModal onClose={() => setCreating(false)} onCreate={createSeries} />}
       {cfg && <SeriesDrawer s={cfg} cast={cfg.id === activeId ? (characters || []) : []} onClose={() => setCfgId(null)} flash={flash}
+        onDelete={deleteSeries}
         onSave={(patch: any) => setSeries((list: any[]) => list.map((x: any) => x.id === cfg.id ? { ...x, ...patch, updated: 'Just now' } : x))} />}
     </div>
   );
 }
 
 function NewSeriesModal({ onClose, onCreate }: any) {
-  const [d, setD] = React.useState({
-    title: '', tagline: '', genre: GENRES[0], format: FORMATS[0], pov: POVS[0],
-    cover: COVER_SCENES[0], palIdx: 0, styleKey: '', canon: 'No on-page violence; dread by absence.',
-  });
+  const [d, setD] = React.useState({ title: '', tagline: '', genre: '' });
   const set = (k: string, v: any) => setD(o => ({ ...o, [k]: v }));
-  const submit = () => onCreate({ ...d, palette: STARTER_PALS[d.palIdx] });
+  const submit = () => onCreate({ ...d });
 
   return (
     <div className="ww-modal" onClick={onClose}>
@@ -115,45 +109,11 @@ function NewSeriesModal({ onClose, onCreate }: any) {
             <span className="ww-field-l">Logline <b>one sentence</b></span>
             <input className="ww-input" value={d.tagline} placeholder="The one line that makes someone tap in." onChange={e => set('tagline', e.target.value)} />
           </div>
-          <div className="ww-field-row">
-            <div className="ww-field">
-              <span className="ww-field-l">Genre</span>
-              <div className="ww-choicerow">
-                {GENRES.slice(0, 5).map(g => <button key={g} className={cx('ww-choice', d.genre === g && 'is-on')} onClick={() => set('genre', g)}>{g}</button>)}
-              </div>
-            </div>
-          </div>
-          <div className="ww-field-row">
-            <div className="ww-field">
-              <span className="ww-field-l">Format</span>
-              <select className="ww-input" value={d.format} onChange={e => set('format', e.target.value)}>{FORMATS.map(f => <option key={f}>{f}</option>)}</select>
-            </div>
-            <div className="ww-field">
-              <span className="ww-field-l">Point of view</span>
-              <select className="ww-input" value={d.pov} onChange={e => set('pov', e.target.value)}>{POVS.map(p => <option key={p}>{p}</option>)}</select>
-            </div>
-          </div>
           <div className="ww-field">
-            <span className="ww-field-l">Style key <b>locks the generator</b></span>
-            <input className="ww-input" value={d.styleKey} placeholder="e.g. Brine & lamp-black" onChange={e => set('styleKey', e.target.value)} />
-            <div className="ww-palrow">
-              {STARTER_PALS.map((p, i) => (
-                <button key={i} className={cx('ww-palopt', d.palIdx === i && 'is-on')} onClick={() => set('palIdx', i)}>
-                  {p.map((c, j) => <i key={j} style={{ background: c }} />)}
-                </button>
-              ))}
-            </div>
+            <span className="ww-field-l">Genre</span>
+            <input className="ww-input" value={d.genre} placeholder="e.g. Solarpunk mystery" onChange={e => set('genre', e.target.value)} />
           </div>
-          <div className="ww-field">
-            <span className="ww-field-l">Cover plate</span>
-            <div className="ww-choicerow">
-              {COVER_SCENES.map(c => <button key={c} className={cx('ww-choice', d.cover === c && 'is-on')} onClick={() => set('cover', c)}>{c.replace('_', ' ')}</button>)}
-            </div>
-          </div>
-          <div className="ww-field">
-            <span className="ww-field-l">Canon rules <b>one per line · the lines the AI must never break</b></span>
-            <textarea className="ww-input" rows={3} value={d.canon} onChange={e => set('canon', e.target.value)} />
-          </div>
+          <p className="ww-cfg-help" style={{ margin: '2px 0 0' }}>The cover plate is assigned later from the Production Library — new series start without one.</p>
         </div>
         <div className="ww-modal-foot">
           <button className="ww-btn ghost" onClick={onClose}>Cancel</button>
@@ -164,54 +124,45 @@ function NewSeriesModal({ onClose, onCreate }: any) {
   );
 }
 
-function SeriesDrawer({ s, onClose, onSave, flash, cast = [] }: any) {
-  const [pal, setPal] = React.useState(s.palette);
-  const [canon, setCanon] = React.useState((s.canon || []).join('\n'));
-  const ROLES = ['Shadow', 'Midtone', 'Key light', 'Accent', 'Tint', 'Tone'];
-  const setColor = (i: number, v: string) => setPal((p: string[]) => p.map((c, j) => j === i ? v : c));
-  const removeColor = (i: number) => setPal((p: string[]) => p.filter((_: any, j: number) => j !== i));
-  const addColor = () => setPal((p: string[]) => [...p, '#8892a0']);
+function SeriesDrawer({ s, onClose, onSave, onDelete, flash, cast = [] }: any) {
+  const [title, setTitle] = React.useState(s.title || '');
+  const [genre, setGenre] = React.useState(s.genre || '');
+  const [tagline, setTagline] = React.useState(s.tagline || '');
   return (
     <React.Fragment>
       <div className="ww-drawer-scrim" onClick={onClose} />
       <aside className="ww-drawer">
         <div className="ww-drawer-cover">
-          <Scene kind={s.cover} />
+          <SeriesCover cover={s.cover} />
           <div className="ww-drawer-cover-grad" />
           <button className="ww-drawer-x" onClick={onClose}>✕</button>
-          <div className="ww-drawer-title"><span>{s.genre}</span><h2>{s.title}</h2></div>
+          <div className="ww-drawer-title"><span>{genre || s.genre}</span><h2>{title || s.title}</h2></div>
         </div>
         <div className="ww-drawer-body">
           <div className="ww-cfg-block">
             <div className="ww-insp-sub">Identity</div>
             <div className="ww-cfg-meta">
               <div><span>Status</span><b>{s.status}</b></div>
-              <div><span>Format</span><b>{s.format}</b></div>
-              <div><span>Point of view</span><b>{s.pov}</b></div>
               <div><span>Last edit</span><b>{s.updated}</b></div>
             </div>
           </div>
           <div className="ww-cfg-block">
-            <div className="ww-cfg-stylehead">
-              <div className="ww-insp-sub" style={{ margin: 0 }}>Style lock · {s.styleKey}</div>
-              <span className="ww-cfg-lockbadge">◆ locked</span>
+            <div className="ww-field">
+              <span className="ww-field-l">Title</span>
+              <input className="ww-input" value={title} placeholder="Series title" onChange={e => setTitle(e.target.value)} />
             </div>
-            <p className="ww-cfg-help">Every plate the generator makes is pinned to this colour key, so the whole series stays on-model. Click a swatch to recolour it.</p>
-            <div className="ww-cfg-pal">
-              {pal.map((c: string, i: number) => (
-                <label key={i} className="ww-cfg-sw">
-                  <input type="color" value={c} onChange={(e) => setColor(i, e.target.value)} />
-                  <i style={{ background: c }} />
-                  <span>{ROLES[i] || 'Colour ' + (i + 1)}</span>
-                  {pal.length > 2 && <button className="ww-cfg-sw-x" title="Remove" onClick={(e) => { e.preventDefault(); removeColor(i); }}>✕</button>}
-                </label>
-              ))}
-              {pal.length < 6 && <button className="ww-cfg-sw-add" title="Add colour" onClick={addColor}>＋</button>}
+            <div className="ww-field" style={{ marginTop: 12 }}>
+              <span className="ww-field-l">Genre</span>
+              <input className="ww-input" value={genre} placeholder="e.g. Solarpunk mystery" onChange={e => setGenre(e.target.value)} />
+            </div>
+            <div className="ww-field" style={{ marginTop: 12 }}>
+              <span className="ww-field-l">Logline</span>
+              <input className="ww-input" value={tagline} placeholder="The one line that makes someone tap in." onChange={e => setTagline(e.target.value)} />
             </div>
           </div>
           <div className="ww-cfg-block">
-            <div className="ww-insp-sub">Canon rules · one per line · the AI will not break these</div>
-            <textarea className="ww-input" rows={4} value={canon} placeholder="One rule per line…" onChange={e => setCanon(e.target.value)} />
+            <div className="ww-insp-sub">Cover plate</div>
+            <p className="ww-cfg-help">Assigned from the Production Library — open <b>Production → Library</b> and choose “Set cover” on any plate.</p>
           </div>
           <div className="ww-cfg-block">
             <div className="ww-insp-sub">Cast roster · {cast.length || 'none yet'}</div>
@@ -221,12 +172,15 @@ function SeriesDrawer({ s, onClose, onSave, flash, cast = [] }: any) {
               </div>
             ) : <p style={{ fontSize: 12.5, color: 'var(--ink3)', lineHeight: 1.55, margin: 0 }}>No characters cast yet. Build the roster in the Narrative workspace.</p>}
           </div>
-          <button className="ww-btn primary" style={{ alignSelf: 'flex-start' }}
-            onClick={() => {
-              onSave?.({ palette: pal, canon: canon.split('\n').map((c: string) => c.trim()).filter(Boolean) });
-              flash('Saved · ' + s.title);
-              onClose();
-            }}>Save configuration</button>
+          <div className="ww-cfg-actions">
+            <button className="ww-btn primary"
+              onClick={() => {
+                onSave?.({ title: title.trim() || s.title, genre: genre.trim(), tagline });
+                flash('Saved · ' + (title.trim() || s.title));
+                onClose();
+              }}>Save configuration</button>
+            <button className="ww-btn danger" onClick={() => onDelete?.(s)}>Delete series</button>
+          </div>
         </div>
       </aside>
     </React.Fragment>

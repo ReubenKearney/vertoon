@@ -10,7 +10,6 @@ export interface LoreEntity {
   aka?: string[];
   status?: string;
   version?: string | number;
-  palette?: string[];
   relationships?: { to: string; as: string }[];
   open_questions?: string[];
   role?: string;

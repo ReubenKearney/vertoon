@@ -13,7 +13,7 @@ import { listLore, createLore, updateLore, deleteLore, type LoreEntity } from '.
 const STATUS_HUE: Record<string, number> = { draft: 40, review: 210, locked: 150 };
 const STATUS_LABEL: Record<string, string> = { draft: 'Draft', review: 'In review', locked: 'Locked' };
 const TYPE_GLYPH: Record<string, string> = { character: '☺', city: '⌖', org: '⬡', location: '⌘', tech: '⚙', food: '✦', story: '¶', glossary: '𝐀' };
-const TYPES = ['character', 'city'] as const; // schema-backed types the editor offers
+const TYPES = ['character', 'city', 'org', 'location', 'tech', 'food', 'story', 'glossary'] as const; // schema-backed types the editor offers
 
 function statusColor(status?: string) { return `oklch(0.7 0.15 ${STATUS_HUE[status || 'draft'] ?? 40})`; }
 function glyphFor(type?: string) { return TYPE_GLYPH[type || ''] || '◇'; }
@@ -21,10 +21,12 @@ function kebab(s: string) { return s.toLowerCase().trim().replace(/[^a-z0-9]+/g,
 function splitLines(s: string) { return s.split('\n').map(x => x.trim()).filter(Boolean); }
 function numIf(s: string): string | number { const t = s.trim(); return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : t; }
 
-function avStyle(palette?: string[]): React.CSSProperties {
-  const p = palette && palette.length ? palette : ['#3a2f5a', '#0a0c12'];
-  const mid = p[Math.min(1, p.length - 1)] || p[0];
-  return { background: `radial-gradient(80% 80% at 50% 30%, ${mid}, ${p[p.length - 1] || '#0a0c12'} 82%)` };
+// Avatar gradient. Lore no longer carries a palette (that lives on the visual
+// plane), so derive a stable hue from the entity id — each entity keeps a
+// distinct, consistent colour without storing one.
+function avStyle(e?: { id?: string; type?: string }): React.CSSProperties {
+  const seed = (e?.id || e?.type || '').split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  return { background: `radial-gradient(80% 80% at 50% 30%, oklch(0.55 0.13 ${seed % 360}), #0a0c12 82%)` };
 }
 
 function StatusPill({ status }: { status?: string }) {
@@ -32,17 +34,6 @@ function StatusPill({ status }: { status?: string }) {
     <span className="ww-sheet-unlocktag" style={{ color: statusColor(status), borderColor: statusColor(status) }}>
       ● {STATUS_LABEL[status || 'draft'] || status}
     </span>
-  );
-}
-
-function Palette({ palette }: { palette?: string[] }) {
-  if (!palette || !palette.length) return null;
-  return (
-    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-      {palette.map((c, i) => (
-        <span key={i} title={c} style={{ width: 22, height: 22, borderRadius: 5, background: c, border: '1px solid rgba(255,255,255,0.14)' }} />
-      ))}
-    </div>
   );
 }
 
@@ -91,7 +82,7 @@ function CityStats({ e }: { e: any }) {
 // --- Editor ------------------------------------------------------------------
 interface Draft {
   id: string; type: string; name: string; status: string; version: string;
-  aka: string; palette: string[]; role: string; portrayal: string;
+  aka: string; role: string; portrayal: string;
   location: string; power: string; threat: string; population: string;
   bannerPrimary: string; bannerSecondary: string;
   relationships: { to: string; as: string }[]; open_questions: string; body: string;
@@ -99,7 +90,7 @@ interface Draft {
 
 function blankDraft(): Draft {
   return {
-    id: '', type: 'character', name: '', status: 'draft', version: '', aka: '', palette: [],
+    id: '', type: 'character', name: '', status: 'draft', version: '', aka: '',
     role: '', portrayal: '', location: '', power: '', threat: '', population: '',
     bannerPrimary: '', bannerSecondary: '', relationships: [], open_questions: '', body: '',
   };
@@ -108,7 +99,7 @@ function draftOf(e: any): Draft {
   return {
     id: e.id, type: e.type, name: e.name || '', status: e.status || 'draft',
     version: e.version != null ? String(e.version) : '', aka: (e.aka || []).join(', '),
-    palette: e.palette ? [...e.palette] : [], role: e.role || '', portrayal: (e.portrayal || []).join('\n'),
+    role: e.role || '', portrayal: (e.portrayal || []).join('\n'),
     location: e.location || '', power: e.power || '', threat: e.threat || '',
     population: e.population != null ? String(e.population) : '',
     bannerPrimary: e.banner?.primary || '', bannerSecondary: e.banner?.secondary || '',
@@ -126,8 +117,6 @@ function payloadOf(d: Draft): LoreEntity {
     open_questions: splitLines(d.open_questions),
   };
   if (d.version.trim()) data.version = numIf(d.version);
-  const pal = d.palette.map(s => s.trim()).filter(Boolean);
-  if (pal.length) data.palette = pal;
   if (d.type === 'character') {
     if (d.role.trim()) data.role = d.role.trim();
     data.portrayal = splitLines(d.portrayal);
@@ -164,10 +153,6 @@ function LoreEditor({ mode, initial, others, onSave, onCancel, busy, error }: {
     set({ relationships: d.relationships.map((r, j) => j === i ? { ...r, ...patch } : r) });
   const addRel = () => set({ relationships: [...d.relationships, { to: others[0]?.id || '', as: '' }] });
   const rmRel = (i: number) => set({ relationships: d.relationships.filter((_, j) => j !== i) });
-
-  const setPal = (i: number, v: string) => set({ palette: d.palette.map((c, j) => j === i ? v : c) });
-  const addPal = () => set({ palette: [...d.palette, '#888888'] });
-  const rmPal = (i: number) => set({ palette: d.palette.filter((_, j) => j !== i) });
 
   const canSave = d.name.trim() && kebab(d.id);
 
@@ -227,19 +212,6 @@ function LoreEditor({ mode, initial, others, onSave, onCancel, busy, error }: {
           <Field label="Banner · secondary"><input className="ww-bp-edit" style={inputStyle} value={d.bannerSecondary} onChange={e => set({ bannerSecondary: e.target.value })} /></Field>
         </div>
       )}
-
-      <Field label="Palette">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          {d.palette.map((c, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#888888'} onChange={e => setPal(i, e.target.value)} style={{ width: 28, height: 28, padding: 0, border: 'none', background: 'none' }} />
-              <input className="ww-bp-edit" style={{ width: 86, fontFamily: 'var(--font-mono)', fontSize: 11 }} value={c} onChange={e => setPal(i, e.target.value)} />
-              <button className="ww-arc-add" onClick={() => rmPal(i)} title="Remove">✕</button>
-            </span>
-          ))}
-          <button className="ww-arc-add" onClick={addPal}>＋ Colour</button>
-        </div>
-      </Field>
 
       <Field label="Relationships">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -332,7 +304,7 @@ export function LoreView({ seriesId, flash }: { seriesId: string; online?: boole
         </div>
         {entities.map((x: any) => (
           <button key={x.id} className={cx('ww-rostercard', x.id === sid && !editing && 'is-sel')} onClick={() => { setEditing(null); setSelId(x.id); }}>
-            <div className="ww-roster-av" style={avStyle(x.palette)}><span>{glyphFor(x.type)}</span></div>
+            <div className="ww-roster-av" style={avStyle(x)}><span>{glyphFor(x.type)}</span></div>
             <div className="ww-roster-meta"><b>{x.name}</b><span>{x.role || x.location || x.type}</span></div>
             <span title={STATUS_LABEL[x.status] || x.status} style={{ width: 8, height: 8, borderRadius: 8, flex: '0 0 auto', background: statusColor(x.status) }} />
           </button>
@@ -368,7 +340,7 @@ export function LoreView({ seriesId, flash }: { seriesId: string; online?: boole
       ) : (
         <div className="ww-bible-profile">
           <div className="ww-bp-hero">
-            <div className="ww-bp-av" style={avStyle(e.palette)}><span style={{ fontSize: 30 }}>{glyphFor(e.type)}</span></div>
+            <div className="ww-bp-av" style={avStyle(e)}><span style={{ fontSize: 30 }}>{glyphFor(e.type)}</span></div>
             <div className="ww-bp-h">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <b style={{ fontSize: 22, color: 'var(--ink)' }}>{e.name}</b>
@@ -382,7 +354,6 @@ export function LoreView({ seriesId, flash }: { seriesId: string; online?: boole
                 <span style={{ textTransform: 'capitalize' }}>{e.type}</span>{e.role ? ` · ${e.role}` : ''}
               </div>
               {e.aka && e.aka.length > 0 && <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 4 }}>aka {e.aka.join(', ')}</div>}
-              <Palette palette={e.palette} />
             </div>
           </div>
 
@@ -405,7 +376,7 @@ export function LoreView({ seriesId, flash }: { seriesId: string; online?: boole
                   const exists = entities.some(x => x.id === r.to);
                   return (
                     <button key={i} className="ww-bp-rel" disabled={!exists} onClick={() => exists && setSelId(r.to)}>
-                      <div className="ww-bp-rel-av" style={avStyle(entities.find(x => x.id === r.to)?.palette)}>{glyphFor(entities.find(x => x.id === r.to)?.type)}</div>
+                      <div className="ww-bp-rel-av" style={avStyle(entities.find(x => x.id === r.to))}>{glyphFor(entities.find(x => x.id === r.to)?.type)}</div>
                       <div><b>{nameOf(r.to)}</b><span>{e.name} — {r.as} →</span></div>
                       <span className="ww-bp-rel-arrow">→</span>
                     </button>

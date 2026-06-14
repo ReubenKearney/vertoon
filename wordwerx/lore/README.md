@@ -29,14 +29,39 @@ and the planes join on a shared per-series `id`:
 
 | Fact                                             | Authored in                | Keyed on   |
 | ------------------------------------------------ | -------------------------- | ---------- |
-| Identity — name, aka, palette, prose, portrayal, relationships | **lore** (this folder)     | `id`       |
+| Identity — name, aka, prose, portrayal, relationships | **lore** (this folder)     | `id`       |
 | Appearances & beats — which episodes/arcs        | **narrative** (`src/world.ts`) | references `id` |
-| Variants, locked ref, LoRA, portrait             | **visual** (`VISDEV` + links)  | references `id` |
+| Variants, locked ref, LoRA, portrait, palette    | **visual** (`VISDEV` + links)  | references `id` |
 
 So `echo` is one entity mentioned in all three: the lore file declares who Echo
 is; the seasons board says which episodes she's in; the visual board holds her
 plates. `_resolve.ts` stitches them together on demand. `npm run lore:gen` prints
 the unified card for `echo` as a proof of this join.
+
+## Field model
+
+Every entity file is **YAML frontmatter + prose body**. Frontmatter is validated
+**strictly** (unknown keys are rejected) against the schema in `_schema.ts`:
+
+- **Shared core** — required and identical for every type, because the loader
+  relies on them for all entities:
+  - `id` — lowercase kebab-case, unique within the series (the join key)
+  - `type` — one of `character`, `city`, `org`, `location`, `tech`, `food`,
+    `story`, `glossary`
+  - `name` — display name
+  - `relationships` — `{ to, as }[]`; every `to` must resolve to a real entity
+    in the same series (default `[]`)
+- **Optional metadata** — allowed on any type, never required: `aka` (default
+  `[]`), `status` (`draft` | `review` | `locked`, default `draft`), `version`,
+  `open_questions` (default `[]`).
+- **Type-specific** —
+  - `character`: `role`, `portrayal` (default `[]`)
+  - `city`: `location`, `power`, `threat`, `population`, `banner`
+    (`{ primary?, secondary? }`)
+  - `org` / `location` / `tech` / `food` / `story` / `glossary`: no extra fields
+    yet — core + metadata only.
+
+The prose body (everything after the frontmatter) is free markdown and optional.
 
 ## Authoring rules
 
@@ -55,8 +80,10 @@ the unified card for `echo` as a proof of this join.
 
 ## Status of the migration
 
-Slice shipped: `character` + `city` schemas, the loader/resolver/consolidate/gen
-pipeline, and three real files (`echo`, `wulan`, `sulawesi`). Remaining work:
-the other entity types (org, location, tech, food, story, glossary), porting the
-rest of the canon doc, and wiring `src/world.ts` to derive `BIBLE`/`SERIES` from
-`LORE` so there is a single source of truth.
+Shipped: schemas for all entity types (`character`, `city`, `org`, `location`,
+`tech`, `food`, `story`, `glossary`), the loader/resolver/consolidate/gen
+pipeline, and three real files (`echo`, `wulan`, `sulawesi`). `character` and
+`city` carry type-specific fields; the rest are core + metadata only until they
+need their own. Remaining work: porting the rest of the canon doc, and wiring
+`src/world.ts` to derive `BIBLE`/`SERIES` from `LORE` so there is a single
+source of truth.

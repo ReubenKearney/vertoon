@@ -6,21 +6,15 @@ export const LORE: Record<string, any[]> = {
       "id": "echo",
       "type": "character",
       "name": "Echo",
-      "aka": [],
-      "status": "locked",
-      "version": 1.6,
-      "palette": [
-        "#030308",
-        "#7b61ff",
-        "#16d6b4",
-        "#120e22"
-      ],
       "relationships": [
         {
           "to": "wulan",
           "as": "guided-by"
         }
       ],
+      "aka": [],
+      "status": "locked",
+      "version": 1.6,
       "open_questions": [
         "Late-series ontology reveal (organic biological core) must stay seeded but unstated in S1."
       ],
@@ -37,23 +31,17 @@ export const LORE: Record<string, any[]> = {
       "id": "wulan",
       "type": "character",
       "name": "Wulan",
-      "aka": [
-        "Walan"
-      ],
-      "status": "locked",
-      "version": 1.6,
-      "palette": [
-        "#070a12",
-        "#ffe3b0",
-        "#ff9d5a",
-        "#3a4a3e"
-      ],
       "relationships": [
         {
           "to": "echo",
           "as": "moral-concern-for"
         }
       ],
+      "aka": [
+        "Walan"
+      ],
+      "status": "locked",
+      "version": 1.6,
       "open_questions": [
         "Spelling: Walan vs Wulan — locked to Wulan; aka retained to catch stray references."
       ],
@@ -69,15 +57,15 @@ export const LORE: Record<string, any[]> = {
       "id": "sulawesi",
       "type": "city",
       "name": "Sulawesi",
-      "aka": [],
-      "status": "review",
-      "version": 1.6,
       "relationships": [
         {
           "to": "wulan",
           "as": "home-of"
         }
       ],
+      "aka": [],
+      "status": "review",
+      "version": 1.6,
       "open_questions": [
         "Population: sources stated both 150M and 175M+ — provisionally locked 175M, confirm.",
         "Lamp colloquial name: replace the 'DALL·E' placeholder artifact with a canon term.",

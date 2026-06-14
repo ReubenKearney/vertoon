@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { buildEpisodeHtml, downloadHtml, type PublishPanel } from './services/publish';
 import { effectiveTextObjects, TextObjectStatic } from './text-objects';
 
-export function Library({ library, setLibrary, onUseAsset, online, flash, characters, seriesLora }: any) {
+export function Library({ library, setLibrary, onUseAsset, onSetCover, online, flash, characters, seriesLora }: any) {
   const cast = characters || [];
   const [filter, setFilter] = React.useState('All');
   const [pending, setPending] = React.useState(0);
@@ -41,7 +41,7 @@ export function Library({ library, setLibrary, onUseAsset, online, flash, charac
           <div key={'sk' + i} className="ww-thumb"><div className="ww-thumb-art ww-skel"><span className="ww-skel-tag">generating…</span></div></div>
         ))}
         {shown.map((a: any) => (
-          <AssetThumb key={a.id} scene={a.scene} label={a.name} sub={a.kind} source={a.source} state={a.state} imageUrl={a.imageUrl} onClick={() => onUseAsset && onUseAsset(a)} />
+          <AssetThumb key={a.id} scene={a.scene} label={a.name} sub={a.kind} source={a.source} state={a.state} imageUrl={a.imageUrl} onClick={() => onUseAsset && onUseAsset(a)} onSetCover={onSetCover ? () => onSetCover(a) : undefined} />
         ))}
       </div>
       <div className="ww-cast">

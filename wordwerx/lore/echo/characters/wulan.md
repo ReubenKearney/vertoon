@@ -6,7 +6,6 @@ role: Lamplighter · the civic limb
 aka: [Walan]
 status: locked
 version: 1.6
-palette: ["#070a12", "#ffe3b0", "#ff9d5a", "#3a4a3e"]
 relationships:
   - { to: echo, as: moral-concern-for }
 portrayal:
