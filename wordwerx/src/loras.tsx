@@ -127,23 +127,35 @@ const LIGHT_PRESETS = [
   'interior, low ambient of engineered bio-tech and algae-battery glow',
 ];
 
+// Scenes drawn from the series world (Dharti): its five megacities and their
+// signature architecture, the Locus, and the wick-lamp tech. Setting/subject
+// only — the look lives in the house style above; lighting varies per row.
 const STARTER_ROWS: SceneRow[] = [
-  { id: 'r1', on: true, scene: 'rooftop solar-sail garden, wide establishing shot, no people', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 6 },
-  { id: 'r2', on: true, scene: 'greenhouse market street, crowd at a distance', place: 'Ext', light: 'midday sun through canopy and glass, dappled light, solar-glow glaze', count: 6 },
-  { id: 'r3', on: true, scene: 'spiral terracotta aqueduct over an alley, architecture only', place: 'Ext', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 5 },
-  { id: 'r4', on: true, scene: 'forest path with fiber-optic roots, lone figure in wide shot', place: 'Ext', light: 'early dawn, low warm directional sun, long soft shadows', count: 5 },
-  { id: 'r5', on: true, scene: 'multi-tier eco-city skyline, establishing shot', place: 'Ext', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 5 },
-  { id: 'r6', on: true, scene: "inventor's workshop with a glass ceiling, single figure", place: 'Int', light: 'interior, sunlight through stained glass, coloured light pools', count: 6 },
-  { id: 'r7', on: true, scene: 'greenhouse interior nave, architecture', place: 'Int', light: 'midday sun through canopy and glass, dappled light, solar-glow glaze', count: 5 },
-  { id: 'r8', on: true, scene: 'underground aqueduct hall, lone figure in wide shot', place: 'Int', light: 'interior, low ambient of engineered bio-tech and algae-battery glow', count: 5 },
-  { id: 'r9', on: true, scene: 'communal hall, small group of people', place: 'Int', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 4 },
-  { id: 'r10', on: true, scene: 'ornate Art Nouveau power gauntlet, prop and machinery detail', place: '—', light: 'neutral workshop light', count: 5 },
-  { id: 'r11', on: true, scene: 'liquid-algae battery rig, machinery detail', place: 'Int', light: 'interior, low ambient of engineered bio-tech and algae-battery glow', count: 4 },
-  { id: 'r12', on: true, scene: 'costume study, full-body figure in woven embroidered textiles', place: 'Ext', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 5 },
-  { id: 'r13', on: true, scene: 'motion dash, figure mid-run with swirling petals and glowing pollen, natural motion not digital blur', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 5 },
-  { id: 'r14', on: true, scene: 'night courtyard with lanterns and bioluminescence, figure', place: 'Ext', light: 'night, moonlight with warm bioluminescent and lamp glow', count: 5 },
-  { id: 'r15', on: true, scene: 'material and texture study — filigree, woven fabric, brass fittings', place: '—', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 4 },
-  { id: 'r16', on: true, scene: 'riverside terrace, two figures in mid-shot', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 4 },
+  // Sulawesi — the only fully-on-land megacity, kept safe by the resin wick-lamp network (Arc 1)
+  { id: 'r1', on: true, scene: 'Sulawesi street at night lined with resin-fuelled downward-flame wick lamps casting pools of light on the ground, no insects, wide establishing shot, no people', place: 'Ext', light: 'night, moonlight with warm bioluminescent and lamp glow', count: 6 },
+  { id: 'r2', on: true, scene: 'a Guild lamplighter on nightly rounds, single robed figure tending a street wick-lamp, mid-shot', place: 'Ext', light: 'night, moonlight with warm bioluminescent and lamp glow', count: 5 },
+  { id: 'r3', on: true, scene: 'dense fully-on-land geothermal megacity by day, low-rise lamp-lined rooftops and venting steam, establishing shot', place: 'Ext', light: 'midday sun through canopy and glass, dappled light, solar-glow glaze', count: 5 },
+  // Bandarpur — shoal megacity on Adam's Bridge: rings, tidal-throat gateworks, underwater hull (Arc 2)
+  { id: 'r4', on: true, scene: 'Bandarpur tidal-throat gateworks, heavy turbine galleries and a navigation aperture over a deep sea channel, architecture only', place: 'Ext', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 5 },
+  { id: 'r5', on: true, scene: 'a circular harbour borough seen from above, inhabited breakwater ring around a calm inner-lagoon market commons, wide establishing shot', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 5 },
+  { id: 'r6', on: true, scene: 'underwater hull district interior, habitable blocks around a glowing light well with a continuous waterline glazing band, lone figure in wide shot', place: 'Int', light: 'interior, low ambient of engineered bio-tech and algae-battery glow', count: 5 },
+  { id: 'r7', on: true, scene: 'stepped arcology mega tower rising over the shoal city, ring vestibules and sealed transfer lobbies, establishing shot', place: 'Ext', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 4 },
+  // Mara — highland city in the cliffs of Mt Kenya, lit by the Crown Lantern (Arc 4)
+  { id: 'r8', on: true, scene: 'Mara highland city embedded into the cliff faces of Mt Kenya, dwellings stepped into the mountainside, establishing shot', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 5 },
+  { id: 'r9', on: true, scene: 'the Crown Lantern summit megastructure capping the mountain as the citywide light source, dramatic wide establishing shot', place: 'Ext', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 5 },
+  { id: 'r10', on: true, scene: 'a district lightwell interior, sealed guided-light gallery with diffusion surfaces washing even daylight into a courtyard, architecture only', place: 'Int', light: 'interior, sunlight through stained glass, coloured light pools', count: 5 },
+  // Xingu — city raised above the Amazon canopy on a single megaflora organism (Arc 3)
+  { id: 'r11', on: true, scene: 'Xingu megaflora city raised above the Amazon canopy, giant orange ginkgo hub trees with engineered bio-ceramic platforms and ring transit loops, establishing shot', place: 'Ext', light: 'midday sun through canopy and glass, dappled light, solar-glow glaze', count: 6 },
+  { id: 'r12', on: true, scene: 'the central Mother Tree towering through the canopy with hub station terraces built onto its trunk, wide shot', place: 'Ext', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 4 },
+  { id: 'r13', on: true, scene: 'industrial-biophilic platform interior among the branches, tensile structures and modular decks, lone figure', place: 'Int', light: 'interior, low ambient of engineered bio-tech and algae-battery glow', count: 4 },
+  // Songhai — Gambia River delta civilisation: river commons, polder hydraulics, night-sealed trenches (Arc 4 climax)
+  { id: 'r14', on: true, scene: 'Songhai river commons, the Gambia treated as a public promenade and marketplace with terraced trench districts along the banks, establishing shot', place: 'Ext', light: 'golden-hour sunlight, warm rim light, glowing air', count: 5 },
+  { id: 'r15', on: true, scene: 'Songhai polder hydraulics, levees sluices and weirs routing flowing water through algae cultivation channels, architecture only, flowing water never still', place: 'Ext', light: 'midday sun through canopy and glass, dappled light, solar-glow glaze', count: 5 },
+  { id: 'r16', on: true, scene: 'a trench district sealing for night, retractable covers and layered meshes closing over a terraced street, small group of people', place: 'Ext', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 4 },
+  // The Locus and signature props/textures
+  { id: 'r17', on: true, scene: "The Locus — Echo's disguised shipping-container sanctuary among ordinary freight containers in a logistics yard, concealed power, cooling and comms vents, mid-shot", place: 'Ext', light: 'dusk, cool blue-violet ambient with warm lamp accents', count: 5 },
+  { id: 'r18', on: true, scene: 'resin wick-lamp prop study, ceramic censer head with a downward flame and brass fittings, machinery and prop detail', place: '—', light: 'neutral workshop light', count: 5 },
+  { id: 'r19', on: true, scene: 'material and texture study — woven embroidered Dharti textiles, brass lamp fittings, bio-ceramic composite, filigree', place: '—', light: 'soft overcast daylight, diffuse even light, muted warmth', count: 4 },
 ];
 
 const PLACES: SceneRow['place'][] = ['Ext', 'Int', '—'];
@@ -393,7 +405,7 @@ function TrainPanel({ onDone, onError, updateLink, characters, seriesLora, updat
   // Quick training-set generator.
   const [genPrompt, setGenPrompt] = React.useState('');
   const [genCount, setGenCount] = React.useState(12);
-  const [genModel, setGenModel] = React.useState<'sdxl' | 'flux'>('sdxl');
+  const [genModel, setGenModel] = React.useState<'sdxl' | 'flux'>('flux');
   const [genBusy, setGenBusy] = React.useState(false);
   const PLAIN = ', isolated subject on a plain neutral light-grey studio background, full body, even lighting';
 
@@ -486,7 +498,7 @@ function TrainPanel({ onDone, onError, updateLink, characters, seriesLora, updat
             <label style={{ fontSize: 11, color: 'var(--ink3)', display: 'flex', gap: 6, alignItems: 'center' }}>Count
               <input type="number" min={4} max={30} value={genCount} onChange={e => setGenCount(+e.target.value)} style={{ width: 56, height: 30, borderRadius: 7, background: 'var(--bg3)', color: 'var(--ink)', border: 'none', boxShadow: 'inset 0 0 0 1px var(--line)', padding: '0 6px' }} />
             </label>
-            <select className="ww-filter" value={genModel} onChange={e => setGenModel(e.target.value as any)}><option value="sdxl">SDXL (fast)</option><option value="flux">Flux</option></select>
+            <select className="ww-filter" value={genModel} onChange={e => setGenModel(e.target.value as any)}><option value="flux">Flux (recommended)</option><option value="sdxl">SDXL (fast)</option></select>
             <button className={cx('ww-gen-btn', genBusy && 'is-busy')} disabled={genBusy} onClick={generateSet}>{genBusy ? 'Generating…' : `✦ Generate ${genCount} images`}</button>
             <span style={{ fontSize: 11, color: 'var(--ink3)' }}>on a clean background, ready to train</span>
           </div>

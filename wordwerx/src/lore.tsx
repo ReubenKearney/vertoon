@@ -377,7 +377,7 @@ export function LoreView({ seriesId, flash }: { seriesId: string; online?: boole
                   return (
                     <button key={i} className="ww-bp-rel" disabled={!exists} onClick={() => exists && setSelId(r.to)}>
                       <div className="ww-bp-rel-av" style={avStyle(entities.find(x => x.id === r.to))}>{glyphFor(entities.find(x => x.id === r.to)?.type)}</div>
-                      <div><b>{nameOf(r.to)}</b><span>{e.name} — {r.as} →</span></div>
+                      <div><b>{nameOf(r.to)}</b><span>{e.name} — {r.as}</span></div>
                       <span className="ww-bp-rel-arrow">→</span>
                     </button>
                   );
