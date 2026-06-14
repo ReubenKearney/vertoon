@@ -162,6 +162,7 @@ export function VisualDev({ tab, setTab, preselect, visdevSeed, bible, character
                   </div>
                 ) : tab === 'board'
                   ? <VariantInspector subj={sel} online={online} charLora={links?.characterLora?.[sel.id]?.loraName}
+                      charTrigger={links?.characterLora?.[sel.id]?.triggerWord} seriesLora={links?.seriesLora}
                       appearance={appearance} bible={bible} flash={flash} onLock={lockVariant} onSetState={setVariantState}
                       onDelete={deleteVariant} onVariant={addVariant} isCharacter={isCharacter(sel)}
                       onField={(f: string, v: any) => patchSubject(sel.id, (s: any) => ({ ...s, [f]: v }))} />
@@ -191,7 +192,7 @@ function SubjectSidebar({ subjects, selId, setSelId, onAdd }: any) {
   );
 }
 
-function VariantInspector({ subj, online, charLora, appearance, bible, flash, onLock, onSetState, onDelete, onVariant, isCharacter, onField }: any) {
+function VariantInspector({ subj, online, charLora, charTrigger, seriesLora, appearance, bible, flash, onLock, onSetState, onDelete, onVariant, isCharacter, onField }: any) {
   const [pending, setPending] = React.useState(0);
   const appear = (appearance && appearance[subj.id]) || (bible || {})[subj.id]?.appearance || '';
   const defaultPrompt = appear ? `${appear} — ${subj.brief}` : subj.brief;
@@ -205,6 +206,7 @@ function VariantInspector({ subj, online, charLora, appearance, bible, flash, on
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
           {subj.locked ? <div className="ww-vd-lockbadge"><span className="ww-vd-lockdot" />{subj.locked} locked</div> : <span className="ww-sheet-unlocktag">No lock</span>}
+          {seriesLora?.loraName && <span className="ww-sheet-unlocktag">Series · {seriesLora.loraName.replace('.safetensors', '')}</span>}
           {charLora && <span className="ww-sheet-unlocktag">LoRA · {charLora.replace('.safetensors', '')}</span>}
         </div>
       </div>
@@ -222,6 +224,8 @@ function VariantInspector({ subj, online, charLora, appearance, bible, flash, on
         prompt={subj.genPrompt ?? defaultPrompt} onPromptChange={(v: string) => onField('genPrompt', v)}
         negative={subj.genNegative ?? NEG_DEFAULT} onNegativeChange={(v: string) => onField('genNegative', v)}
         lora={isCharacter ? charLora : undefined}
+        loraTrigger={isCharacter ? charTrigger : undefined}
+        seriesLora={seriesLora}
         plainBgDefault={isCharacter} fullBody={isCharacter}
         online={online} flash={flash} buttonLabel="✦ Generate variant"
         onPending={setPending}

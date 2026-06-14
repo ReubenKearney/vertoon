@@ -13,7 +13,7 @@ import { createReadStream } from 'node:fs';
 import { submitRun, getStatus, cancelJob, getBalance } from './runpod.js';
 import { listLoras, uploadLora, uploadTrainingImage, deleteLora } from './loras.js';
 import { buildTrainWorkflow } from './train-workflow.js';
-import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, isLinkKey, assetCount, getCatalogue, setCatalogue } from './store.js';
+import { saveAsset, getAsset, deleteAsset, getState, patchState, setLink, setSeriesLora, isLinkKey, assetCount, getCatalogue, setCatalogue } from './store.js';
 
 const app = express();
 // Larger limit: /api/assets receives base64 images.
@@ -83,6 +83,14 @@ app.post('/api/links/:category', wrap(async (req, res) => {
   const { key, value } = req.body || {};
   if (!key) return res.status(400).json({ error: 'key is required' });
   await setLink(seriesOf(req), category, key, value);
+  res.json({ ok: true });
+}));
+
+// Set (or clear with value:null) the series-default style LoRA for one series.
+// Body: { value: { loraName, triggerWord?, strength? } | null }
+app.post('/api/series-lora', wrap(async (req, res) => {
+  const { value } = req.body || {};
+  await setSeriesLora(seriesOf(req), value ?? null);
   res.json({ ok: true });
 }));
 

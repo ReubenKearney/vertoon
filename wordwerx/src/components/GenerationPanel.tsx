@@ -2,7 +2,7 @@ import React from 'react';
 import { cx } from '../ui';
 import {
   USE_CASES, txt2imgFlux, txt2imgSDXL, datasetBatch, expressionEdit, perspectiveConsistent,
-  type UseCase,
+  type UseCase, type LoraRef,
 } from '../workflows';
 import { submitWorkflow, pollJob, imageSrc, listLoras, type Lora } from '../services/runpod';
 import { saveAsset } from '../services/store';
@@ -20,6 +20,8 @@ export interface GenerationPanelProps {
   promptLabel?: string;                 // textarea placeholder hint
   showLora?: boolean;                   // show LoRA picker
   lora?: string;                        // forced LoRA (e.g. a character's); used even if picker hidden
+  loraTrigger?: string;                 // trigger word for the forced character LoRA (prepended to prompt)
+  seriesLora?: { loraName: string; triggerWord?: string; strength?: number }; // series-default style LoRA, stacked UNDER the character LoRA
   refImage?: string;                    // data URL — required for edit/perspective workflows
   count?: number;                       // dataset-batch size
   online?: boolean;                     // false => Generate disabled
@@ -42,11 +44,10 @@ const MODEL_DEFAULTS = {
 } as const;
 const FULL_BODY = ', full-body shot, head to toe, entire body and feet visible, full-length, standing, centered';
 
-interface AdvOpts { prompt: string; lora?: string; count?: number; controlType?: 'canny' | 'depth'; negative?: string; seed?: number; steps?: number; width?: number; height?: number }
+interface AdvOpts { prompt: string; loras?: LoraRef[]; count?: number; controlType?: 'canny' | 'depth'; negative?: string; seed?: number; steps?: number; width?: number; height?: number }
 
 function buildWorkflow(useCase: UseCase, o: AdvOpts): unknown {
-  const loraRef = o.lora ? { name: o.lora, strength: 0.9 } : undefined;
-  const base = { positive: o.prompt, negative: o.negative, seed: o.seed, steps: o.steps, width: o.width, height: o.height, lora: loraRef };
+  const base = { positive: o.prompt, negative: o.negative, seed: o.seed, steps: o.steps, width: o.width, height: o.height, loras: o.loras };
   switch (useCase) {
     case 'txt2img-sdxl': return txt2imgSDXL(base);
     case 'dataset-batch': return datasetBatch({ ...base, count: o.count ?? 8 });
@@ -60,12 +61,19 @@ const PLAIN_BG = ', isolated subject on a plain neutral light-grey studio backgr
 
 export function GenerationPanel(p: GenerationPanelProps) {
   const ui = useUI();
-  const [useCase, setUseCase] = React.useState<UseCase>(p.workflows[0]);
+  // Prefer Flux when a series LoRA is active — in-app LoRAs are Flux-only.
+  const [useCase, setUseCase] = React.useState<UseCase>(
+    () => (p.seriesLora?.loraName && p.workflows.includes('txt2img-flux')) ? 'txt2img-flux' : p.workflows[0],
+  );
   const [internalPrompt, setInternalPrompt] = React.useState(p.initialPrompt ?? '');
   const prompt = p.prompt !== undefined ? p.prompt : internalPrompt;
   const setPrompt = (v: string) => (p.onPromptChange ? p.onPromptChange(v) : setInternalPrompt(v));
   const [lora, setLora] = React.useState(p.lora ?? '');
   const [loras, setLoras] = React.useState<Lora[]>([]);
+  // Series-default style LoRA: on by default when one exists; per-scope strengths.
+  const [useSeries, setUseSeries] = React.useState(!!p.seriesLora?.loraName);
+  const [seriesStrength, setSeriesStrength] = React.useState(p.seriesLora?.strength ?? 0.65);
+  const [charStrength, setCharStrength] = React.useState(0.9);
   const [controlType, setControlType] = React.useState<'canny' | 'depth'>('canny');
   const [busy, setBusy] = React.useState(false);
   const [status, setStatus] = React.useState<string | null>(null);
@@ -91,6 +99,8 @@ export function GenerationPanel(p: GenerationPanelProps) {
   // Only seed the internal prompt when uncontrolled.
   React.useEffect(() => { if (p.prompt === undefined && p.initialPrompt !== undefined) setInternalPrompt(p.initialPrompt); }, [p.initialPrompt, p.prompt]);
   React.useEffect(() => { if (p.lora !== undefined) setLora(p.lora); }, [p.lora]);
+  // Re-sync the series-LoRA toggle/strength when the active series' LoRA changes.
+  React.useEffect(() => { setUseSeries(!!p.seriesLora?.loraName); setSeriesStrength(p.seriesLora?.strength ?? 0.65); }, [p.seriesLora?.loraName]); // eslint-disable-line react-hooks/exhaustive-deps
   // When the model changes, reset steps to that model's best default.
   React.useEffect(() => { setSteps(MODEL_DEFAULTS[modelOf(useCase)].steps); }, [useCase]);
 
@@ -108,9 +118,19 @@ export function GenerationPanel(p: GenerationPanelProps) {
     const expected = useCase === 'dataset-batch' ? (p.count ?? 8) : 1;
     p.onPending?.(expected);
     try {
-      const positive = prompt + (plainBg ? PLAIN_BG : '') + (p.fullBody ? FULL_BODY : '');
+      // Resolve the LoRA stack: series style (base) under the character (on top).
+      // Dataset batches carry the series style only — don't bake another identity in.
+      const seriesRef = useSeries && p.seriesLora?.loraName ? { name: p.seriesLora.loraName, strength: seriesStrength } : null;
+      const charRef = effectiveLora ? { name: effectiveLora, strength: charStrength } : null;
+      const stack = (useCase === 'dataset-batch' ? [seriesRef] : [seriesRef, charRef]).filter(Boolean) as LoraRef[];
+      // Trigger words make the LoRAs fire — prepend them, de-duped (vs each other and the prompt).
+      const trigs = [useSeries ? p.seriesLora?.triggerWord : undefined, useCase === 'dataset-batch' ? undefined : p.loraTrigger]
+        .map(t => t?.trim()).filter(Boolean) as string[];
+      const seen = new Set<string>(); const lc = prompt.toLowerCase();
+      const trigPrefix = trigs.filter(t => { const k = t.toLowerCase(); if (seen.has(k) || lc.includes(k)) return false; seen.add(k); return true; }).join(', ');
+      const positive = (trigPrefix ? trigPrefix + ', ' : '') + prompt + (plainBg ? PLAIN_BG : '') + (p.fullBody ? FULL_BODY : '');
       const wf = buildWorkflow(useCase, {
-        prompt: positive, lora: effectiveLora || undefined, count: p.count, controlType,
+        prompt: positive, loras: stack, count: p.count, controlType,
         negative: caps.negatives ? (negative || undefined) : undefined, seed: seedLock ? seed : undefined,
         steps: steps || undefined, width, height,
       });
@@ -120,7 +140,7 @@ export function GenerationPanel(p: GenerationPanelProps) {
       const res = await pollJob(jobId, { onTick: s => setStatus(s.status) });
       const outs = res.output?.images ?? [];
       const saved: GenResult[] = [];
-      for (const im of outs) saved.push(await saveAsset(imageSrc(im), { workflow: useCase, prompt, lora: effectiveLora }));
+      for (const im of outs) saved.push(await saveAsset(imageSrc(im), { workflow: useCase, prompt, lora: effectiveLora, loras: stack.map(l => l.name) }));
       await p.onResult(saved, { useCase, prompt, lora: effectiveLora || undefined });
       ui.notifyDone(saved.length);
       p.flash?.(`Generated ${saved.length} image${saved.length === 1 ? '' : 's'}`);
@@ -132,7 +152,14 @@ export function GenerationPanel(p: GenerationPanelProps) {
 
   // Friendly status + rough countdown (cold start ≈ up to ~2 min).
   function statusLine(): string {
-    if (!busy) return offline ? 'Offline — generation paused' : missingRef ? 'Needs a reference image' : (p.lora ? `LoRA: ${p.lora.replace('.safetensors', '')}` : 'Ready');
+    if (!busy) {
+      if (offline) return 'Offline — generation paused';
+      if (missingRef) return 'Needs a reference image';
+      const tags: string[] = [];
+      if (useSeries && p.seriesLora?.loraName) tags.push(`Style: ${p.seriesLora.loraName.replace('.safetensors', '')}`);
+      if (effectiveLora) tags.push(`Char: ${effectiveLora.replace('.safetensors', '')}`);
+      return tags.length ? tags.join(' + ') : 'Ready';
+    }
     const est = 120, left = Math.max(0, est - elapsed);
     const phase = status === 'IN_QUEUE' ? 'Warming up (cold start)' : status === 'IN_PROGRESS' ? 'Rendering' : 'Submitting';
     return `${phase} · ${elapsed}s${left > 0 ? ` · ~${left}s left` : ' · almost done'}`;
@@ -162,6 +189,13 @@ export function GenerationPanel(p: GenerationPanelProps) {
             <option value="canny">Lines (canny)</option>
             <option value="depth">Depth</option>
           </select>
+        )}
+        {p.seriesLora?.loraName && (
+          <button className={cx('ww-filter', useSeries && 'is-on')}
+            title={`Series style LoRA: ${p.seriesLora.loraName.replace('.safetensors', '')} — applied under the character LoRA. Click to toggle for this generation.`}
+            onClick={() => setUseSeries(v => !v)}>
+            {useSeries ? '◆ Series style' : '◇ Series style'}
+          </button>
         )}
         {p.showLora && (
           <select className="ww-filter" value={lora} onChange={e => setLora(e.target.value)} title="Character LoRA">
@@ -195,6 +229,12 @@ export function GenerationPanel(p: GenerationPanelProps) {
             <label>Steps<input type="number" value={steps} onChange={e => setSteps(+e.target.value)} /></label>
             <label>Width<input type="number" step={64} value={width} onChange={e => setWidth(+e.target.value)} /></label>
             <label>Height<input type="number" step={64} value={height} onChange={e => setHeight(+e.target.value)} /></label>
+            {useSeries && p.seriesLora?.loraName && (
+              <label>Series LoRA strength<input type="number" step={0.05} min={0} max={1.5} value={seriesStrength} onChange={e => setSeriesStrength(+e.target.value)} /></label>
+            )}
+            {effectiveLora && useCase !== 'dataset-batch' && (
+              <label>Character LoRA strength<input type="number" step={0.05} min={0} max={1.5} value={charStrength} onChange={e => setCharStrength(+e.target.value)} /></label>
+            )}
             <label className="ww-adv-toggle ww-adv-full">
               <input type="checkbox" checked={plainBg} onChange={e => setPlainBg(e.target.checked)} />
               <span><b>Plain background</b> — clean studio backdrop, recommended for character references</span>

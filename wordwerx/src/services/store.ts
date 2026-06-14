@@ -3,6 +3,7 @@
 // persisted state + links on load so a refresh restores generated art.
 
 export interface StoreLinks {
+  seriesLora?: { loraName: string; triggerWord?: string; strength?: number };
   characterLora: Record<string, { loraName: string; triggerWord?: string }>;
   characterPortrait: Record<string, string>;
   visdevVariant: Record<string, string>;
@@ -92,6 +93,13 @@ export async function patchState(seriesId: string, patch: { links?: Partial<Stor
 export async function setLink(seriesId: string, category: keyof StoreLinks, key: string, value: unknown): Promise<void> {
   await jsonOrThrow(await fetch(`/api/links/${category}?series=${encodeURIComponent(seriesId)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, value }),
+  }));
+}
+
+/** Set (value object) or clear (null) the series-default style LoRA for one series. */
+export async function setSeriesLora(seriesId: string, value: StoreLinks['seriesLora'] | null): Promise<void> {
+  await jsonOrThrow(await fetch(`/api/series-lora?series=${encodeURIComponent(seriesId)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value }),
   }));
 }
 

@@ -52,11 +52,38 @@ image's lines). Generated angles collect in a gallery.
   LoRA**. When it finishes, the LoRA is uploaded to the volume, listed, and
   linked to that character automatically.
 
+### Production → Compose (lay out the vertoon)
+Select a panel from the rail, then in the inspector:
+- **Layers** — assign generated art per layer, back → front. **Drag the ⋮⋮ grip**
+  to reorder layers (depth ordering); the assigned art follows the layer. The
+  layer depth (`z…`) drives parallax.
+- **Text** — your dialogue and captions appear as **bubbles and caption boxes
+  directly on the panel**. Drag them to position, drag the right-edge handle to
+  resize, drag the bubble's bottom handle to **aim the tail**, and **double-click
+  to edit the words** (this writes back to the Script, so the two never diverge).
+  The delivery you pick (Spoken / Shouted / Whispered / Thought / Voice-over / …)
+  changes the bubble's look. Add an extra **＋ Balloon** or a **＋ SFX** word
+  (sound-effect lettering with size + rotation) per panel.
+- **Gutter** — set the whitespace *after* the panel (None / Beat / Pause / Dead
+  air, or the slider). This is the webtoon pacing beat; it shows in Compose,
+  Preview, and the export.
+- **Effects** — pick a one-click **preset** (Dramatic entrance, Rain ambience,
+  Impact hit, Slow burn, Deep space) to drop a tuned effect stack, or add effects
+  individually. Use the **scrub bar** under the selected panel (▶ or drag) to play
+  the panel's scroll pass — reveal, parallax, and transition animate live without
+  leaving Compose.
+
+**Reorder panels** by dragging them in the rail (or the ▴▾ buttons). **Undo/redo**
+any edit with `Ctrl+Z` / `Ctrl+Shift+Z` (text fields keep their own undo).
+
 ### Production → Publish (offline export)
 Assign generated images to panels, then **Export offline comic (.html)**. The
-export inlines every assigned image and bakes in the scroll-reveal, producing a
-single self-contained file that opens with no internet. The size shown is the
-real file size; toggle **Downscale** to shrink it.
+export inlines every assigned image, the on-canvas bubbles/captions/SFX, and the
+panel gutters, producing a single self-contained file that opens with no internet.
+Leave **Bake motion** on to ship the parallax, reveals, and transitions in the
+file (it respects a reader's reduced-motion setting); turn it off for a static
+scroll-reveal export. The size shown is the real file size; toggle **Downscale**
+to shrink it.
 
 ## Create an episode from scratch (the whole loop)
 
@@ -73,10 +100,13 @@ The end-to-end recipe, verified working with real generation (2026-06-13):
 5. **Narrative → Script** → ＋ Add panel — write narration, **＋ Add dialogue** for
    speaker lines (speakers come from your cast).
 6. **Production → Library** → generate scene/background art with a prompt.
-7. **Production → Compose** → select each panel → in the inspector, **assign art to
-   layers** (back → front) from the dropdown.
-8. **Production → Publish** → **⤓ Export offline comic (.html)** — the file lands in
-   your Downloads and opens anywhere, no internet needed.
+7. **Production → Compose** → select each panel → **assign art to layers** (back →
+   front), **place the speech bubbles/captions** on the panel, set a **gutter** for
+   pacing, and add **effects** (try a preset, then scrub to preview the motion).
+8. **Production → Preview** → read it in the phone frame — your real art scrolls with
+   live parallax, reveals, and your placed lettering.
+9. **Production → Publish** → **⤓ Export offline comic (.html)** (Bake motion on) —
+   the file lands in your Downloads and opens anywhere, no internet needed.
 
 ## Tips
 - A character's LoRA + canonical image are the backbone of consistency — lock a

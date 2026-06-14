@@ -71,6 +71,42 @@ export const EFFECT_TYPES: Record<string, any> = {
   },
 };
 
+// One-click effect stacks — curated starting points that make the dynamic
+// features discoverable. Applying a preset replaces any existing fx of the
+// same types (no duplicate stacks); `panel` carries non-fx fields (gap).
+export const FX_PRESETS: { id: string; label: string; glyph: string; blurb: string; fx: { type: string; params: Record<string, any> }[]; panel?: Record<string, any> }[] = [
+  {
+    id: 'dramatic', label: 'Dramatic entrance', glyph: '◔', blurb: 'Scale-in reveal with a flash of impact', fx: [
+      { type: 'reveal', params: { Motion: 'Scale in', Duration: 0.9, Easing: 'spring' } },
+      { type: 'impact', params: { Intensity: 35, Flash: 'White' } },
+    ],
+  },
+  {
+    id: 'rain', label: 'Rain ambience', glyph: '∿', blurb: 'Rain loop over a continuous ambient bed', fx: [
+      { type: 'loop', params: { Kind: 'Rain', Density: 70, Speed: 1.2 } },
+      { type: 'sound', params: { Source: 'Ambient — city dusk', Trigger: 'Continuous', Volume: 55 } },
+    ],
+  },
+  {
+    id: 'hit', label: 'Impact hit', glyph: '✦', blurb: 'Hard shake, slam SFX, beat hold', fx: [
+      { type: 'impact', params: { Intensity: 75, Flash: 'Red' } },
+      { type: 'sound', params: { Source: 'SFX — hatch slam', Trigger: 'On enter', Volume: 85 } },
+      { type: 'pacing', params: { Mode: 'Hold beat', Length: 0.6 } },
+    ],
+  },
+  {
+    id: 'slowburn', label: 'Slow burn', glyph: '⏸', blurb: 'Blur-in, slow scrub, dead air after', panel: { gap: 200 }, fx: [
+      { type: 'reveal', params: { Motion: 'Blur in', Duration: 1.6, Easing: 'ease-in-out' } },
+      { type: 'pacing', params: { Mode: 'Slow scrub', Length: 2.0 } },
+    ],
+  },
+  {
+    id: 'deep', label: 'Deep space', glyph: '▤', blurb: 'Strong both-axis parallax drift', fx: [
+      { type: 'parallax', params: { Strength: 90, Axis: 'Both' } },
+    ],
+  },
+];
+
 export function mkFx(type: string, over: any = {}): any {
   const base = EFFECT_TYPES[type];
   const params: Record<string, any> = {};

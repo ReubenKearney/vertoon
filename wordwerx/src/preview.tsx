@@ -1,12 +1,14 @@
 import React from 'react';
 import { cx } from './ui';
 import { FxChip } from './ui';
-import { Scene } from './scenes';
+import { PanelArt } from './panel-art';
+import { effectiveTextObjects, TextObjectStatic, injectTextObjectCss } from './text-objects';
 import { usePreviewEngine, hasFx, soundLabel, flashColor, tapPayload, mapEasing } from './preview-engine';
 
-export function Preview({ panels, episode }: any) {
+export function Preview({ panels, episode, links }: any) {
   const { scroller, panelRefs, active, flashKey, shakeKey, shakeAmp, auto, setAuto, progress, taps, setTaps, holdingId, restart } = usePreviewEngine(panels);
   const phoneRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(injectTextObjectCss, []);
 
   // Impact shake: a one-shot Web Animation on the phone frame (not the scroller, so
   // scrollTop/parallax are untouched). WAA survives the engine's per-frame re-renders,
@@ -71,12 +73,14 @@ export function Preview({ panels, episode }: any) {
             return (
               <section key={p.id} ref={(el: HTMLElement | null) => { panelRefs.current[p.id] = el; }}
                 className="ww-rpanel" data-motion={reveal ? reveal.params.Motion : 'Fade'}
-                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px', '--rev-ease': mapEasing(reveal ? reveal.params.Easing : 'ease-out') } as any}>
-                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><Scene kind={p.scene} loop={loop ? loop.params.Kind : null} loopDensity={loop ? loop.params.Density : 55} loopSpeed={loop ? loop.params.Speed : 1} /></div>
+                style={{ '--rev-dur': (reveal ? reveal.params.Duration : 0.8) + 's', '--rev-dist': (reveal ? reveal.params.Distance : 0) + 'px', '--rev-ease': mapEasing(reveal ? reveal.params.Easing : 'ease-out'),
+                  // gutter: % of width so the authored 800px-space gap scales with the reader
+                  marginBottom: p.gap ? ((p.gap / 800) * 100) + '%' : undefined } as any}>
+                <div className={cx('ww-rev-art', reveal && 'ww-rev')}><PanelArt panel={p} links={links} loop={loop ? loop.params.Kind : null} loopDensity={loop ? loop.params.Density : 55} loopSpeed={loop ? loop.params.Speed : 1} /></div>
                 <div className="ww-rpanel-grade" />
-                {p.dialogue
-                  ? <div className="ww-rev ww-rdlg"><span className="ww-rdlg-name">{p.speaker}</span>{p.dialogue}</div>
-                  : p.caption ? <div className="ww-rev ww-rcap">{p.caption}</div> : null}
+                <div className="ww-rev ww-tolayer">
+                  {effectiveTextObjects(p).map((t: any) => <TextObjectStatic key={t.id} t={t} panel={p} />)}
+                </div>
                 {pace && <div className={cx('ww-rev ww-rpace', holdingId === p.id && 'is-holding')}>{pace.params.Mode} · {pace.params.Length}s</div>}
                 {trans && <div className="ww-rtrans" data-trans={trans.params.Type} />}
                 {tap && (

@@ -19,6 +19,9 @@ mkdirSync(ASSETS_DIR, { recursive: true });
 
 export interface AssetMeta { id: string; file: string; mime: string; origin?: unknown; createdAt: number }
 export interface Links {
+  // The series-default style LoRA, applied UNDER every character LoRA so the
+  // whole series stays on-model. Singular per series (not a Record).
+  seriesLora?: { loraName: string; triggerWord?: string; strength?: number };
   characterLora: Record<string, { loraName: string; triggerWord?: string }>;
   characterPortrait: Record<string, string>;     // charId -> assetId
   visdevVariant: Record<string, string>;         // "subj:v" -> assetId
@@ -187,6 +190,14 @@ export function isLinkKey(k: string): k is LinkKey { return (LINK_KEYS as readon
 export async function setLink(seriesId: string, category: LinkKey, key: string, value: unknown): Promise<void> {
   const db = await readDb();
   (seriesOf(db, seriesId).links as any)[category][key] = value;
+  await writeDb(db);
+}
+
+/** Replace (or clear with null) a series' singular series-default LoRA. Uses
+ *  full-replace semantics (patchState's merge can't drop stale fields / clear). */
+export async function setSeriesLora(seriesId: string, value: Links['seriesLora'] | null): Promise<void> {
+  const db = await readDb();
+  seriesOf(db, seriesId).links.seriesLora = value ?? undefined;
   await writeDb(db);
 }
 
