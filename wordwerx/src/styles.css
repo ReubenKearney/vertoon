@@ -329,6 +329,9 @@ input,textarea,select{font-family:inherit;color:inherit;}
 .ww-thumb:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px var(--line2),var(--shadow);}
 .ww-thumb.is-sel{box-shadow:inset 0 0 0 1.6px var(--accent);}
 .ww-thumb-art{aspect-ratio:1.5;position:relative;overflow:hidden;background:#06070c;}
+.ww-thumb-cover-btn{position:absolute;top:8px;right:8px;z-index:4;font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:rgba(8,10,16,.72);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);padding:4px 8px;border-radius:7px;opacity:0;transition:.14s;cursor:pointer;}
+.ww-thumb:hover .ww-thumb-cover-btn,.ww-thumb-cover-btn:focus-visible{opacity:1;}
+.ww-thumb-cover-btn:hover{background:var(--accent);}
 .ww-thumb.is-tall .ww-thumb-art{aspect-ratio:.8;}
 .ww-thumb-meta{padding:10px 11px;}
 .ww-thumb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
@@ -344,6 +347,13 @@ input,textarea,select{font-family:inherit;color:inherit;}
 .ww-castcard-meta{display:flex;flex-direction:column;gap:2px;min-width:0;}
 .ww-castcard-meta b{font-size:12px;}
 .ww-castcard-meta span{font-size:9.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* LoRA library card — vertical so long .safetensors names wrap instead of overflowing. */
+.ww-loracard{display:flex;flex-direction:column;border-radius:11px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden;}
+.ww-loracard.is-series{box-shadow:inset 0 0 0 1.5px var(--accent2);}
+.ww-loracard-art{height:62px;position:relative;display:grid;place-items:center;}
+.ww-loracard-meta{display:flex;flex-direction:column;gap:3px;padding:11px 12px 4px;min-width:0;}
+.ww-loracard-meta b{font-size:12.5px;color:var(--ink);line-height:1.3;word-break:break-word;}
+.ww-loracard-meta span{font-size:9.5px;color:var(--ink3);font-family:var(--font-mono);}
 
 /* ---------- STORY ---------- */
 .ww-story{padding:0;max-width:980px;margin:0 auto;}

@@ -3,7 +3,7 @@ import { cx } from './ui';
 import { mkFx } from './data';
 import { SERIES } from './world';
 import { getSeriesContent } from './series-data';
-import { Scene } from './scenes';
+import { SeriesCover } from './scenes';
 import { Copilot } from './copilot';
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle } from './tweaks-panel';
 import { Compose } from './compose';
@@ -12,7 +12,6 @@ import { Library, Story, Publish } from './stages';
 import { Series } from './series';
 import { Narrative } from './narrative';
 import { VisualDev } from './visdev';
-import { LoraManager } from './loras';
 import { useOnline, canGenerate } from './services/online';
 import { getBalance } from './services/runpod';
 import { getState, patchState, setLink as apiSetLink, setSeriesLora as apiSetSeriesLora, getCatalogue, putCatalogue, type StoreLinks } from './services/store';
@@ -295,7 +294,7 @@ export default function App() {
         <div className={cx('ww-series-switch', seriesMenu && 'is-open')} role="button" tabIndex={0}
           onClick={() => setSeriesMenu(m => !m)}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSeriesMenu(m => !m); } }}>
-          <div className="ww-series-switch-cover"><Scene kind={(activeObj as any).cover} /></div>
+          <div className="ww-series-switch-cover"><SeriesCover cover={(activeObj as any).cover} /></div>
           <div className="ww-series-switch-meta"><b>{(activeObj as any).title}</b><span>{(activeObj as any).status}</span></div>
           <span className="ww-series-switch-chev">▾</span>
           {seriesMenu && (
@@ -303,7 +302,7 @@ export default function App() {
               {series.map(s => (
                 <button key={s.id} className={cx('ww-series-menu-item', s.id === activeSeries && 'is-on')}
                   onClick={() => { setActiveSeries(s.id); setSeriesMenu(false); flash('Switched to ' + s.title); }}>
-                  <div className="ww-series-menu-cover"><Scene kind={(s as any).cover} /></div>
+                  <div className="ww-series-menu-cover"><SeriesCover cover={(s as any).cover} /></div>
                   <b>{s.title}</b>
                   <i style={{ background: `oklch(0.7 0.16 ${(s as any).hue})` }} />
                 </button>
@@ -346,13 +345,11 @@ export default function App() {
         <div className={cx('ww-stagewrap', showCop && 'has-cop')}>
           <main className="ww-stage">
             {ws === 'series' && <Series series={series} setSeries={setSeries} activeId={activeSeries} setActive={setActiveSeries} onOpen={openSeries} characters={characters} flash={flash} />}
-            {/* LoRA manager is cross-series — render it for any active series. */}
-            {ws === 'visual' && (subs as any).visual === 'loras' && <LoraManager key={activeSeries} seriesId={activeSeries} characters={characters} flash={flash} updateLink={updateLink} seriesLora={links?.seriesLora} updateSeriesLora={updateSeriesLora} />}
             {ws === 'narrative' && <Narrative key={activeSeries} seriesId={activeSeries} characters={characters} setCharacters={setCharacters} addCharacter={addCharacter} updateCharacter={updateCharacter} seasons={seasons} setSeasons={setSeasons} arcs={arcs} setArcs={setArcs} bible={bible} updateBible={updateBible} panels={panels} setPanels={setPanels} episode={episode} tab={(subs as any).narrative} setTab={(v: string) => setSub('narrative', v)} onGoVisual={(id: string) => { setWs('visual'); setSub('visual', 'board'); setVisualSelId(id || null); }} online={online} links={links} appearance={appearance} updateAppearance={updateAppearance} updateLink={updateLink} flash={flash} />}
-            {ws === 'visual' && (subs as any).visual !== 'loras' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
+            {ws === 'visual' && <VisualDev key={activeSeries} visdevSeed={content.visdev} bible={bible} characters={characters} tab={(subs as any).visual} setTab={(v: string) => setSub('visual', v)} preselect={visualSelId} flash={flash} online={online} links={links} appearance={appearance} updateLink={updateLink} updateSeriesLora={updateSeriesLora} seriesId={activeSeries} visdevExtra={visdevExtra} persistVisdev={persistVisdev} hydrated={hydrated} />}
             {ws === 'production' && (
               (subs as any).production === 'story' ? <Story key={activeSeries} panels={panels} episode={episode} canon={(activeObj as any)?.canon || []} arcs={arcs} /> :
-              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} online={online} flash={flash} characters={characters} seriesLora={links?.seriesLora} /> :
+              (subs as any).production === 'library' ? <Library library={library} setLibrary={setLibrary} onUseAsset={(a: any) => flash('"' + a.name + '" added to canvas')} onSetCover={(a: any) => { const cover = a.imageUrl || a.scene; if (!cover) { flash('That plate has no image to use as a cover.'); return; } setSeries((list: any[]) => list.map((x: any) => x.id === activeSeries ? { ...x, cover, updated: 'Just now' } : x)); flash('Cover set · ' + (activeObj?.title || 'series')); }} online={online} flash={flash} characters={characters} seriesLora={links?.seriesLora} /> :
               (subs as any).production === 'compose' ? <Compose key={activeSeries} panels={panels} setPanels={setPanels} selId={selId} setSelId={setSelId} canvasModel={t.canvasModel} fxUI={t.fxUI} library={library} links={links} updateLink={updateLink} /> :
               (subs as any).production === 'preview' ? <Preview panels={panels} episode={episode} links={links} /> :
               <Publish panels={panels} library={library} links={links} episode={episode} characters={characters} updateLink={updateLink} flash={flash} />

@@ -6,7 +6,6 @@ role: Hybrid consciousness · protagonist
 aka: []
 status: locked
 version: 1.6
-palette: ["#030308", "#7b61ff", "#16d6b4", "#120e22"]
 relationships:
   - { to: wulan, as: guided-by }
 portrayal:

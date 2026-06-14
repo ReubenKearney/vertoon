@@ -157,6 +157,8 @@ textarea.ww-input{resize:vertical;line-height:1.55;}
 .ww-btn.primary:disabled{opacity:.4;cursor:default;filter:none;}
 .ww-btn.ghost{background:var(--bg3);color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line);}
 .ww-btn.ghost:hover{color:var(--ink);}
+.ww-btn.danger{background:transparent;color:#ff7a6a;box-shadow:inset 0 0 0 1px color-mix(in oklab,#ff7a6a 45%,transparent);}
+.ww-btn.danger:hover{background:color-mix(in oklab,#ff7a6a 14%,transparent);color:#ff8f80;}
 
 /* configure drawer */
 .ww-drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,94vw);z-index:120;background:var(--bg2);box-shadow:-30px 0 90px -20px #000,inset 1px 0 0 var(--line2);display:flex;flex-direction:column;animation:ww-slidein .24s cubic-bezier(.2,.7,.2,1) both;}
@@ -171,6 +173,8 @@ textarea.ww-input{resize:vertical;line-height:1.55;}
 .ww-drawer-title span{font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);}
 .ww-drawer-body{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:22px;}
 .ww-cfg-block .ww-insp-sub{margin-bottom:10px;}
+.ww-cfg-actions{display:flex;align-items:center;gap:10px;}
+.ww-cfg-actions .ww-btn.danger{margin-left:auto;}
 .ww-cfg-canon{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
 .ww-cfg-canon li{font-size:12.5px;line-height:1.5;color:var(--ink2);padding:10px 12px;border-radius:9px;background:var(--bg3);box-shadow:inset 0 0 0 1px var(--line);position:relative;padding-left:28px;}
 .ww-cfg-canon li::before{content:"\00a7";position:absolute;left:11px;top:9px;color:var(--accent);font-size:13px;}

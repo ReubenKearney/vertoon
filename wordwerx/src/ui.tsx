@@ -29,7 +29,7 @@ export function StateDot({ state }: { state: string }) {
   return <span className="ww-state"><i style={{ background: `oklch(0.72 0.16 ${hue})` }} />{state}</span>;
 }
 
-export function AssetThumb({ scene, label, sub, source, state, onClick, selected, tall, imageUrl }: any) {
+export function AssetThumb({ scene, label, sub, source, state, onClick, selected, tall, imageUrl, onSetCover }: any) {
   const ui = useUI();
   return (
     <button className={cx('ww-thumb', selected && 'is-sel', tall && 'is-tall')} onClick={onClick}>
@@ -37,6 +37,11 @@ export function AssetThumb({ scene, label, sub, source, state, onClick, selected
         {imageUrl
           ? <img className="ww-zoomable" src={imageUrl} alt={label} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} onClick={e => { e.stopPropagation(); ui.openImage(imageUrl); }} />
           : <Scene kind={scene} />}
+        {onSetCover && (
+          <span className="ww-thumb-cover-btn" role="button" tabIndex={0} title="Set as series cover"
+            onClick={e => { e.stopPropagation(); onSetCover(); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onSetCover(); } }}>◳ Set cover</span>
+        )}
       </div>
       <div className="ww-thumb-meta">
         <div className="ww-thumb-top">

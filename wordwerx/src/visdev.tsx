@@ -6,11 +6,13 @@ import { generate, imageSrc } from './services/runpod';
 import { expressionEdit, img2imgFlux } from './workflows';
 import { assetUrl, assetIdOf, loadAssetDataUrl, saveAsset } from './services/store';
 import { useUI } from './ui-context';
+import { LoraManager } from './loras';
 
 const VIS_TABS = [
   { id: 'board', label: 'Prototype board', glyph: '▦' },
   { id: 'sheets', label: 'Model sheets', glyph: '◳' },
   { id: 'locations', label: 'Locations', glyph: '⊞' },
+  { id: 'loras', label: 'LoRAs', glyph: '◆' },
 ];
 
 const STATE_META: Record<string, { color: string }> = {
@@ -29,7 +31,7 @@ function Thumb({ url, scene, style, onSelect }: { url?: string; scene?: string; 
   return <Scene kind={scene || 'tunnels'} />;
 }
 
-export function VisualDev({ tab, setTab, preselect, visdevSeed, bible, characters, flash: flashProp, online, links, appearance, updateLink, visdevExtra, persistVisdev, hydrated }: any) {
+export function VisualDev({ tab, setTab, preselect, visdevSeed, bible, characters, flash: flashProp, online, links, appearance, updateLink, updateSeriesLora, seriesId, visdevExtra, persistVisdev, hydrated }: any) {
   const [subjects, setSubjects] = React.useState(() =>
     (visdevSeed || []).map((s: any) => ({ ...s, variants: s.variants.map((v: any) => ({ ...v })), history: [...s.history], sheetImgs: { poses: {}, expressions: {} } }))
   );
@@ -146,7 +148,9 @@ export function VisualDev({ tab, setTab, preselect, visdevSeed, bible, character
         ))}
       </div>
       <div className="ww-vis-body">
-        {tab === 'locations'
+        {tab === 'loras'
+          ? <LoraManager seriesId={seriesId} characters={characters} flash={flash} updateLink={updateLink} seriesLora={links?.seriesLora} updateSeriesLora={updateSeriesLora} />
+          : tab === 'locations'
           ? <Locations online={online} flash={flash} links={links} updateLink={updateLink} />
           : (
             <div className="ww-proto">
@@ -380,7 +384,7 @@ function Locations({ online, flash, updateLink }: any) {
           <h2>New perspectives</h2>
           <p>Load a location image, describe a new camera angle, and set how far to deviate. Lower = closer to the source; higher = a bigger angle change.</p>
         </div>
-        <button className="ww-filter" onClick={() => fileRef.current?.click()}>⤓ Load location image</button>
+        <button className="ww-gen-btn" onClick={() => fileRef.current?.click()}>⤓ Load location image</button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) pickRef(f); e.currentTarget.value = ''; }} />
       </div>
       {ref ? (

@@ -64,7 +64,6 @@ function frontmatter(d: any): string {
       if (d.banner.secondary) L.push(`  secondary: ${scalar(d.banner.secondary)}`);
     }
   }
-  if (d.palette?.length) L.push(`palette: ${flowArr(d.palette)}`);
   if (d.relationships?.length) {
     L.push('relationships:');
     for (const r of d.relationships) L.push(`  - { to: ${scalar(r.to)}, as: ${scalar(r.as)} }`);

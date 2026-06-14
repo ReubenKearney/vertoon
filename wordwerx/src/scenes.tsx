@@ -1,4 +1,5 @@
 import React from 'react';
+import { assetUrl } from './services/store';
 
 const SCENE_CSS = `
 @keyframes ww-flicker { 0%,100%{opacity:.9} 45%{opacity:.55} 50%{opacity:1} 60%{opacity:.7} }
@@ -227,6 +228,19 @@ export function Scene({ kind, py = 0, strength = 0, loop = null, loopDensity = 5
     <div ref={ref} className={'ww-scene ' + className} style={style}>
       <Builder />
       {loop && <LoopOverlay kind={loop} density={loopDensity} speed={loopSpeed} />}
+    </div>
+  );
+}
+
+// A series cover plate: a built-in Scene (seeded covers), an image assigned from
+// the Production Library, or a blank placeholder before a cover has been set.
+export function SeriesCover({ cover, className = '', style = {} }: { cover?: string; className?: string; style?: React.CSSProperties }) {
+  if (cover && SCENES[cover]) return <Scene kind={cover} className={className} style={style} />;
+  const fill: React.CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%' };
+  if (cover) return <img src={assetUrl(cover)} alt="" className={className} style={{ ...fill, objectFit: 'cover', display: 'block', ...style }} />;
+  return (
+    <div className={className} style={{ ...fill, display: 'grid', placeItems: 'center', background: 'radial-gradient(120% 95% at 50% 28%, #1b2030, #0a0c12 82%)', ...style }}>
+      <span style={{ fontSize: 26, opacity: 0.22, lineHeight: 1 }}>▣</span>
     </div>
   );
 }

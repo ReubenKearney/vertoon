@@ -27,24 +27,35 @@ const Relationship = z.object({
 // consolidate step mark provisional entries.
 const Status = z.enum(['draft', 'review', 'locked']);
 
-// Every entity shares this core. `type` discriminates the per-type extensions.
+// ── Shared core ──────────────────────────────────────────────────────────────
+// The identity + graph contract that MUST be consistent across every entity
+// type. These are exactly the fields the loader relies on for all entities: the
+// join key (`id`), the `type` discriminator, a human-readable `name`, and the
+// integrity-checked `relationships` graph. Nothing type-specific lives here.
 const Core = {
   id: Id,
-  type: z.string(),
+  type: z.string(), // narrowed to a literal by each member below
   name: z.string().min(1),
+  relationships: z.array(Relationship).default([]),
+};
+
+// ── Shared optional metadata ─────────────────────────────────────────────────
+// Generic authoring metadata permitted on ANY type but NOT part of the required
+// core — an entity is valid without it. Kept uniform so a field never means
+// something different between types.
+const Meta = {
   aka: z.array(z.string()).default([]), // alternate spellings — kills Walan/Wulan drift
   status: Status.default('draft'),
   version: z.union([z.string(), z.number()]).optional(),
-  palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).optional(),
-  relationships: z.array(Relationship).default([]),
-  // Housekeeping captured ON the entity instead of in a graveyard at the bottom
-  // of one giant doc. The loader can surface these as a live open-questions feed.
+  // Housekeeping captured ON the entity; the consolidate step surfaces these as
+  // a live open-questions feed.
   open_questions: z.array(z.string()).default([]),
 };
 
 export const CharacterSchema = z
   .object({
     ...Core,
+    ...Meta,
     type: z.literal('character'),
     role: z.string().optional(),
     // Canon portrayal rules. Unlike free prose, these are checkable: the
@@ -56,6 +67,7 @@ export const CharacterSchema = z
 export const CitySchema = z
   .object({
     ...Core,
+    ...Meta,
     type: z.literal('city'),
     location: z.string().optional(),
     power: z.string().optional(),
@@ -68,10 +80,28 @@ export const CitySchema = z
   })
   .strict();
 
-// The discriminated union the loader validates each file against. New entity
-// types (org, location, tech, food, story, glossary) slot in here as the
-// migration proceeds — the slice ships character + city to prove the shape.
-export const EntitySchema = z.discriminatedUnion('type', [CharacterSchema, CitySchema]);
+// Entity types that carry no type-specific fields yet — core + shared metadata
+// only. Each becomes first-class the moment it needs its own fields: give it a
+// dedicated schema (like character/city) and swap it into the union below.
+export const OrgSchema = z.object({ ...Core, ...Meta, type: z.literal('org') }).strict();
+export const LocationSchema = z.object({ ...Core, ...Meta, type: z.literal('location') }).strict();
+export const TechSchema = z.object({ ...Core, ...Meta, type: z.literal('tech') }).strict();
+export const FoodSchema = z.object({ ...Core, ...Meta, type: z.literal('food') }).strict();
+export const StorySchema = z.object({ ...Core, ...Meta, type: z.literal('story') }).strict();
+export const GlossarySchema = z.object({ ...Core, ...Meta, type: z.literal('glossary') }).strict();
+
+// The discriminated union the loader validates each file against — every entity
+// type the system accepts.
+export const EntitySchema = z.discriminatedUnion('type', [
+  CharacterSchema,
+  CitySchema,
+  OrgSchema,
+  LocationSchema,
+  TechSchema,
+  FoodSchema,
+  StorySchema,
+  GlossarySchema,
+]);
 
 export type Character = z.infer<typeof CharacterSchema>;
 export type City = z.infer<typeof CitySchema>;

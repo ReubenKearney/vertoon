@@ -12,7 +12,7 @@ export function LoraManager({ flash, updateLink, characters, seriesLora, updateS
   const [loras, setLoras] = React.useState<Lora[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState<'library' | 'train'>('library');
+  const [tab, setTab] = React.useState<'library' | 'train'>('train');
 
   const refresh = React.useCallback(async () => {
     setLoading(true); setErr(null);
@@ -31,46 +31,54 @@ export function LoraManager({ flash, updateLink, characters, seriesLora, updateS
   }
 
   return (
-    <div className="ww-sheet" style={{ padding: 24 }}>
-      <div className="ww-insp-sub" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <b style={{ color: 'var(--ink)' }}>LoRAs</b>
-        <button className={cx('ww-filter', tab === 'library' && 'is-on')} onClick={() => setTab('library')}>Library</button>
-        <button className={cx('ww-filter', tab === 'train' && 'is-on')} onClick={() => setTab('train')}>Train new</button>
-        {seriesLora?.loraName && <span className="ww-sheet-unlocktag" title="Applied under every character LoRA in this series">◆ Series style: {seriesLora.loraName.replace('.safetensors', '')}</span>}
-        <span style={{ flex: 1 }} />
+    <div className="ww-sheet">
+      <div className="ww-sheet-top">
+        <div>
+          <div className="ww-pv-kicker">Visual Dev · LoRAs</div>
+          <h2>
+            Style &amp; character models
+            {seriesLora?.loraName && <span className="ww-sheet-unlocktag" style={{ marginLeft: 10 }} title="Applied under every character LoRA in this series">◆ {seriesLora.loraName.replace('.safetensors', '')}</span>}
+          </h2>
+          <p>Train a series-style or character LoRA, or upload an existing .safetensors. Trained LoRAs land on the network volume and become selectable everywhere generation happens.</p>
+        </div>
         <UploadButton onPick={onUpload} />
       </div>
 
-      {err && <div className="ww-toast" style={{ position: 'static', margin: '12px 0', color: '#ff7a6a' }}>{err}</div>}
+      <div className="ww-filters" style={{ marginBottom: 18 }}>
+        <button className={cx('ww-filter', tab === 'train' && 'is-on')} onClick={() => setTab('train')}>Train new</button>
+        <button className={cx('ww-filter', tab === 'library' && 'is-on')} onClick={() => setTab('library')}>Library</button>
+      </div>
+
+      {err && <div className="ww-toast" style={{ position: 'static', margin: '0 0 16px', color: '#ff7a6a' }}>{err}</div>}
 
       {tab === 'library' && (
-        <div style={{ marginTop: 16 }}>
-          {loading ? <p>Loading LoRAs…</p> : loras.length === 0 ? (
-            <p style={{ opacity: 0.7 }}>No LoRAs on the volume yet. Upload a .safetensors or train one.</p>
-          ) : (
-            <div className="ww-libgrid">
-              {loras.map(l => {
-                const isSeries = seriesLora?.loraName === l.name;
-                return (
-                <div key={l.name} className={cx('ww-castcard', isSeries && 'is-locked')}>
-                  <div className="ww-castcard-art" style={{ background: 'radial-gradient(80% 80% at 50% 30%, oklch(0.5 0.13 285), #0a0c12 80%)' }}>
-                    <span className="ww-castcard-mono">{l.name.replace('.safetensors', '')}</span>
+        loading ? <p style={{ opacity: 0.7 }}>Loading LoRAs…</p> : loras.length === 0 ? (
+          <div className="ww-sheet-empty"><b>No LoRAs yet</b><p>Upload a .safetensors or train one — they land on the network volume and become selectable everywhere generation happens.</p></div>
+        ) : (
+          <div className="ww-libgrid">
+            {loras.map(l => {
+              const isSeries = seriesLora?.loraName === l.name;
+              return (
+                <div key={l.name} className={cx('ww-loracard', isSeries && 'is-series')}>
+                  <div className="ww-loracard-art" style={{ background: 'radial-gradient(80% 80% at 50% 30%, oklch(0.5 0.13 285), #0a0c12 80%)' }}>
                     {isSeries && <span className="ww-varcard-lock">◆ series style</span>}
                   </div>
-                  <div className="ww-castcard-meta"><b>{l.name}</b><span>{(l.size / 1e6).toFixed(1)} MB</span></div>
+                  <div className="ww-loracard-meta">
+                    <b title={l.name}>{l.name.replace('.safetensors', '')}</b>
+                    <span>{(l.size / 1e6).toFixed(1)} MB · .safetensors</span>
+                  </div>
                   {updateSeriesLora && (
-                    <button className={cx('ww-filter', isSeries && 'is-on')} style={{ margin: '0 10px 10px' }}
+                    <button className={cx('ww-filter', isSeries && 'is-on')} style={{ margin: 'auto 12px 12px' }}
                       title={isSeries ? 'Stop using this as the series style LoRA' : 'Apply this LoRA under every character LoRA in this series'}
                       onClick={() => isSeries ? updateSeriesLora(null) : updateSeriesLora({ loraName: l.name, triggerWord: l.name.replace('.safetensors', ''), strength: 0.65 })}>
                       {isSeries ? '◆ Unset series style' : '◇ Set as series style'}
                     </button>
                   )}
                 </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {tab === 'train' && <TrainPanel characters={characters} updateLink={updateLink} seriesLora={seriesLora} updateSeriesLora={updateSeriesLora} seriesId={seriesId ?? 'default'} onDone={(m) => { note(m); refresh(); setTab('library'); }} onError={setErr} />}
